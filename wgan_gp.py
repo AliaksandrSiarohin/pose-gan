@@ -2,15 +2,16 @@ from keras import backend as K
 from keras.layers.merge import _Merge
 from keras.optimizers import Adam
 from gan import GAN
-
+from keras.backend import tf as ktf
 def wasserstein_loss(y_true, y_pred):
-    return K.mean(y_true * y_pred)
+    return -K.mean(y_true * y_pred)
 
-def gradient_penalty_loss(discriminator, averaged_samples, gradient_penalty_weight):
-    gradients = K.gradients(K.sum(discriminator(averaged_samples)), averaged_samples)
-    gradient_l2_norm = K.sqrt(K.sum(K.square(gradients)))
+def gradient_penalty_loss(discriminator, averaged_samples, batch_size, gradient_penalty_weight):
+    gradients = K.gradients(K.sum(discriminator(averaged_samples)), averaged_samples)[0]
+    gradients = K.reshape(gradients, (batch_size, -1))
+    gradient_l2_norm = K.sqrt(K.sum(K.square(gradients), axis = 1))
     gradient_penalty = gradient_penalty_weight * K.square(1 - gradient_l2_norm)
-    return gradient_penalty
+    return K.mean(gradient_penalty)
 
 class WGAN_GP(GAN):
     """
@@ -18,8 +19,8 @@ class WGAN_GP(GAN):
     """
     def __init__(self, generator, discriminator,
                        generator_input, discriminator_input,
-                       generator_optimizer = Adam(0.0001, beta_1=0.5, beta_2=0.9),
-                       discriminator_optimizer = Adam(0.0001, beta_1=0.5, beta_2=0.9),
+                       generator_optimizer = Adam(0.0001, beta_1=0., beta_2=0.9),
+                       discriminator_optimizer = Adam(0.0001, beta_1=0., beta_2=0.9),
                        cmd_args = None):
         super(WGAN_GP, self).__init__(generator, discriminator, generator_input, 
                         discriminator_input, generator_optimizer, discriminator_optimizer, cmd_args)
@@ -37,8 +38,8 @@ class WGAN_GP(GAN):
         
         def discriminator_loss(y_true, y_pred):
             y_true = 2 * (y_true - 0.5)
-            return wasserstein_loss(y_true, y_pred) + gradient_penalty_loss(self._discriminator,
-                                                           averaged_samples, self._gradient_penalty_weight)
+            return 2 * wasserstein_loss(y_true, y_pred) + gradient_penalty_loss(self._discriminator,
+                                             averaged_samples, self._batch_size, self._gradient_penalty_weight)
         
         return discriminator_loss
         

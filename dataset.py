@@ -67,3 +67,29 @@ class MNISTDataset(ArrayDataset):
         image = (image * 127.5) + 127.5
         image = np.squeeze(np.round(image).astype(np.uint8))
         return image
+    
+import os
+import pylab as plt
+from skimage.transform import resize
+from skimage import img_as_ubyte
+class FolderDataset(UGANDataset):
+    def __init__(self, input_dir, batch_size, noise_size, image_size):
+        super(FolderDataset, self).__init__(batch_size, noise_size)        
+        self._image_names = np.array([os.path.join(input_dir, name) for name in os.listdir(input_dir)])
+        self._image_size = image_size
+        self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)
+        
+    def next_generator_sample(self):
+        return np.random.normal(size=(self._batch_size, self._noise_size)), self._generator_y
+    
+    def _load_discriminator_data(self, index):
+        return np.array([resize(plt.imread(img_name), self._image_size) * 2 - 1
+                         for img_name in self._image_names[index]])
+    
+    def _shuffle_discriminator_data(self):
+        np.random.shuffle(self._image_names)
+        
+    def display(self, batch, row=8, col=8):
+        image = super(FolderDataset, self).display(batch, row, col)
+        image = img_as_ubyte((image + 1) / 2)
+        return image
