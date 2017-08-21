@@ -35,6 +35,9 @@ def get_args():
 args = get_args()
 assert K.image_data_format() == 'channels_last'
 
+#from gan import GAN
+#import mnist_architectures as architectures
+#from dataset import MNISTDataset as Dataset
 from wgan_gp import WGAN_GP as GAN
 import small_res_architectures as architectures
 from dataset import FolderDataset as Dataset
@@ -56,8 +59,7 @@ def train():
     if args.generator_checkpoint is None:
         generator = architectures.make_generator()
     else:
-        generator = load_model(args.generator_checkpoint)
-    
+        generator = load_model(args.generator_checkpoint)    
     print ("Generator Summary:")
     generator.summary()
        
@@ -77,9 +79,7 @@ def train():
     dataset = Dataset(batch_size = args.batch_size, noise_size = noise_size, 
                       input_dir=args.input_folder, image_size=image_size[:2])
     
-    image = dataset.display(generator.predict_on_batch(dataset.next_generator_sample()[0]))
-    generated_data = generator.predict_on_batch(dataset.next_generator_sample()[0])
-    gt_image = dataset.next_discriminator_sample(generated_data)[0][:args.batch_size]
+    gt_image = dataset.next_discriminator_sample()
     save_image(dataset.display(gt_image), args.output_dir, 'gt_data.png')
   
     for epoch in range(args.number_of_epochs):        
@@ -89,21 +89,22 @@ def train():
         
         for i in tqdm(range(int(dataset._batches_before_shuffle // args.training_ratio))):
             for j in range(args.training_ratio):
-                
-                generated_data = generator.predict_on_batch(dataset.next_generator_sample()[0])
-                image_batch, y_batch = dataset.next_discriminator_sample(generated_data)
-                loss = discriminator_model.train_on_batch(image_batch, y_batch)
+                image_batch = dataset.next_discriminator_sample()
+                noise_batch = dataset.next_generator_sample()
+                #All zeros as ground truth because it`s not used
+                loss = discriminator_model.train_on_batch([image_batch, noise_batch],
+                                                          np.zeros([args.batch_size]))
                 discriminator_loss_list.append(loss)
             
-            noise_batch, y_batch = dataset.next_generator_sample()
-            loss = generator_model.train_on_batch(noise_batch, y_batch)
+            noise_batch = dataset.next_generator_sample()
+            loss = generator_model.train_on_batch(noise_batch, np.zeros([args.batch_size]))
             generator_loss_list.append(loss)
            
         print ("Discriminator loss: ", np.mean(discriminator_loss_list))
         print ("Generator loss: ", np.mean(generator_loss_list))
         
         if (epoch + 1) % args.display_ratio == 0:            
-            image = dataset.display(generator.predict_on_batch(dataset.next_generator_sample()[0]))
+            image = dataset.display(generator.predict_on_batch(dataset.next_generator_sample()))
             save_image(image, args.output_dir, 'epoch_{}.png'.format(epoch))
         
         

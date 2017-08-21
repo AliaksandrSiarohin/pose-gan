@@ -11,7 +11,7 @@ class UGANDataset(object):
         self._current_batch = 0
         
     def next_generator_sample(self):
-        return np.random.rand(self._batch_size, self._noise_size), self._generator_y
+        return np.random.rand(self._batch_size, self._noise_size)
     
     def _load_discriminator_data(self, index):
         None
@@ -19,14 +19,14 @@ class UGANDataset(object):
     def _shuffle_discriminator_data(self):
         None
 
-    def next_discriminator_sample(self, generated_data):
+    def next_discriminator_sample(self):
         self._current_batch %= self._batches_before_shuffle
         if self._current_batch == 0:
             self._shuffle_discriminator_data()
         index = np.arange(self._current_batch * self._batch_size, (self._current_batch + 1) * self._batch_size)
         self._current_batch += 1
-        image_batch = np.concatenate([self._load_discriminator_data(index), generated_data], axis = 0)
-        return image_batch, self._discriminator_y
+        image_batch = self._load_discriminator_data(index)
+        return image_batch
         
 
     def display(self, batch, row=8, col=8):
@@ -80,7 +80,7 @@ class FolderDataset(UGANDataset):
         self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)
         
     def next_generator_sample(self):
-        return np.random.normal(size=(self._batch_size, self._noise_size)), self._generator_y
+        return np.random.normal(size=(self._batch_size, self._noise_size))
     
     def _load_discriminator_data(self, index):
         return np.array([resize(plt.imread(img_name), self._image_size) * 2 - 1
