@@ -27,7 +27,7 @@ def get_args():
     parser.add_argument("--checkpoint_ratio", default=100, type=int, help="Number of epochs between consecutive checkpoints")
     parser.add_argument("--generator_checkpoint", default=None, help="Previosly saved model of generator")
     parser.add_argument("--discriminator_checkpoint", default=None, help="Previosly saved model of discriminator")
-    parser.add_argument("--input_folder", default='../flowers', help='Folder with real images for training')
+    parser.add_argument("--input_folder", default='../market-dataset/bounding_box_train', help='Folder with real images for training')
     parser.add_argument("--display_ratio", default=1,  help='Number of epochs between ploting')
     args = parser.parse_args()
     return args
@@ -71,7 +71,7 @@ def train():
     discriminator.summary()
     
     noise_size = 128
-    image_size = (64, 64, 3)
+    image_size = (128, 64, 3)
     generator_model, discriminator_model = GAN(generator, discriminator, 
                                                Input(shape=(noise_size, )), Input(shape=image_size),
                                                cmd_args = args ).compile_models()

@@ -82,11 +82,11 @@ def resblock(x, kernel_size, resample, nfilters):
     return y                  
 
 def make_generator():
-    """Creates a generator model that takes a 512x4x4-dimensional noise vector as a "seed", and outputs images
-    of size 64x64x3."""
+    """Creates a generator model that takes a 128-dimensional noise vector as a "seed", and outputs images
+    of size 128x64x3."""
     x = Input((128, ))
-    y = Dense(512 * 4 * 4) (x)
-    y = Reshape((4, 4, 512)) (y)
+    y = Dense(512 * 8 * 4) (x)
+    y = Reshape((8, 4, 512)) (y)
     
     y = resblock(y, (3, 3), 'UP', 512)
     y = resblock(y, (3, 3), 'UP', 256)
@@ -100,19 +100,10 @@ def make_generator():
     return Model(inputs=x, outputs=y) 
 
 
-def make_generator_part():
-    x = Input((128, ))
-    y = Dense(512 * 4 * 4) (x)
-    y = Reshape((4, 4, 512)) (y)
-    
-    y = resblock(y, (3, 3), 'UP', 512, 512)    
-    
-    return Model(inputs=x, outputs=y)
-
 def make_discriminator():
     """Creates a discriminator model that takes an image as input and outputs a single value, representing whether
     the input is real or generated."""
-    x = Input((64, 64, 3))
+    x = Input((128, 64, 3))
     y = Conv2D(64, (3, 3), kernel_initializer='he_uniform',
                       use_bias = True, padding='same') (x)
     y = resblock(y, (3, 3), 'DOWN', 128)
