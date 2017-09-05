@@ -1,5 +1,4 @@
 from keras import backend as K
-from keras.layers.merge import _Merge
 from keras.optimizers import Adam
 from gan import GAN
 

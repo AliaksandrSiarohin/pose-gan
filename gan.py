@@ -32,9 +32,8 @@ class GAN(object):
         """
         self._set_trainable(self._generator, True)
         self._set_trainable(self._discriminator, False)
-
-        generator_output = self._generator(self._generator_input)
-        discriminator_output_fake = self._discriminator(generator_output)
+        
+        discriminator_output_fake = self._discriminator(self._discriminator_fake_input)
 
         generator_model = Model(inputs=[self._generator_input], outputs=[discriminator_output_fake])
         generator_model.compile(optimizer=self._generator_optimizer, loss=self._loss_generator())
@@ -51,9 +50,8 @@ class GAN(object):
             Create model that produce discriminator scores from real_data and noise(that will be inputed to generator)
         """
         self._set_trainable(self._generator, False)
-        self._set_trainable(self._discriminator, True)
+        self._set_trainable(self._discriminator, True)        
         
-        self._discriminator_fake_input = self._generator(self._generator_input)
         disc_in = Concatenate(axis=0)([self._discriminator_input, self._discriminator_fake_input])
 
         discriminator_model = Model(inputs=[self._discriminator_input, self._generator_input],
@@ -68,4 +66,5 @@ class GAN(object):
         return discriminator_crossentrohy_loss
 
     def compile_models(self):
+        self._discriminator_fake_input = self._generator(self._generator_input)
         return self._compile_generator(), self._compile_discriminator()

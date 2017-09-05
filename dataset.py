@@ -95,16 +95,19 @@ class FolderDataset(UGANDataset):
         return image
     
 import pandas as pd
+import json
 class PoseDataset(FolderDataset):
-    def __init_(self, input_dir, batch_size, noise_size, image_size, pose_anotations):
+    def __init__(self, input_dir, batch_size, noise_size, image_size, pose_anotations):
         super(PoseDataset, self).__init__(input_dir, batch_size, noise_size, image_size)
         self._pose_anotations_df = pd.read_csv(pose_anotations, sep = ':')
     def next_generator_sample(self):
         noise = super(PoseDataset, self).next_generator_sample()
         
-        sample_index = np.random.choice(len(df), size = 64)        
-        keypoints_x = np.array([json.loads(keypoints) for keypoints in df.iloc[sample_index]['keypoints_x']])
-        keypoints_y = np.array([json.loads(keypoints) for keypoints in df.iloc[sample_index]['keypoints_y']])
+        sample_index = np.random.choice(len(self._pose_anotations_df), size = 64)        
+        keypoints_x = np.array([json.loads(keypoints) 
+                        for keypoints in self._pose_anotations_df.iloc[sample_index]['keypoints_x']])
+        keypoints_y = np.array([json.loads(keypoints) 
+                        for keypoints in self._pose_anotations_df.iloc[sample_index]['keypoints_y']])
         keypoints_x = np.expand_dims(keypoints_x, 2)
         keypoints_y = np.expand_dims(keypoints_y, 2)
 

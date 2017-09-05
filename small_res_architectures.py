@@ -44,7 +44,7 @@ class LayerNorm(Layer):
 
 
 def resblock(x, kernel_size, resample, nfilters):
-    assert resample in ["UP", "DOWN"]
+    assert resample in ["UP", "DOWN", "SAME"]
    
     if resample == "DOWN":
         shortcut = AveragePooling2D(pool_size = (2, 2)) (x)
@@ -62,7 +62,7 @@ def resblock(x, kernel_size, resample, nfilters):
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
                                  use_bias = True, padding='same') (convpath)        
         y = Add() ([shortcut, convpath])
-    else:
+    elif resample == "UP":
         shortcut = UpSampling2D(size=(2, 2)) (x)        
         shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
                           kernel_initializer='he_uniform', use_bias = True) (shortcut)
@@ -78,8 +78,21 @@ def resblock(x, kernel_size, resample, nfilters):
                                  use_bias = True, padding='same') (convpath)
         
         y = Add() ([shortcut, convpath])
+    else:      
+        shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
+                          kernel_initializer='he_uniform', use_bias = True) (x)
+                
+        convpath = BatchNormalization(axis=-1) (x)
+        convpath = Activation('relu') (convpath)
+        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
+                                 use_bias = False, padding='same')(convpath)        
+        convpath = BatchNormalization(axis=-1) (convpath)
+        convpath = Activation('relu') (convpath)
+        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
+                                 use_bias = True, padding='same') (convpath)
         
-    return y                  
+        y = Add() ([shortcut, convpath])
+    return y
 
 def make_generator():
     """Creates a generator model that takes a 128-dimensional noise vector as a "seed", and outputs images
