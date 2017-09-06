@@ -1,4 +1,4 @@
-from small_res_architectures import make_discriminator
+from small_res_architectures import LayerNorm
 
 from keras.models import Sequential, Model
 from keras.layers import Dense, Reshape, Flatten, Activation, Input, Lambda
@@ -12,6 +12,7 @@ from keras.engine.topology import Layer, InputSpec
 from keras import initializers
 from keras.backend import tf as ktf
 import numpy as np
+
 
 class PoseMapFromCordinatesLayer(Layer):
     def __init__(self, map_size, point_size, **kwargs):
@@ -86,14 +87,15 @@ class PoseMapFromCordinatesLayer(Layer):
 
     
 def resblock(x, kernel_size, resample, nfilters):
-    assert resample in ["UP", "SAME"]
+    assert resample in ["UP", "SAME", "DOWN"]
    
     if resample == "UP":
         shortcut = UpSampling2D(size=(2, 2)) (x)        
         shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
                           kernel_initializer='he_uniform', use_bias = True) (shortcut)
                 
-        convpath = Activation('relu') (x)
+        convpath = BatchNormalization(axis=-1) (x)
+        convpath = Activation('relu') (convpath)
         convpath = UpSampling2D(size=(2, 2))(convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
                                  use_bias = False, padding='same')(convpath)        
@@ -103,13 +105,12 @@ def resblock(x, kernel_size, resample, nfilters):
                                  use_bias = True, padding='same') (convpath)
         
         y = Add() ([shortcut, convpath])
-        y = BatchNormalization(axis=-1) (y)
-    else:      
+    elif resample == "SAME":      
         shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
                           kernel_initializer='he_uniform', use_bias = True) (x)
                 
-        
-        convpath = Activation('relu') (x)
+        convpath = BatchNormalization(axis=-1) (x)
+        convpath = Activation('relu') (convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
                                  use_bias = False, padding='same')(convpath)        
         convpath = BatchNormalization(axis=-1) (convpath)
@@ -118,7 +119,24 @@ def resblock(x, kernel_size, resample, nfilters):
                                  use_bias = True, padding='same') (convpath)
         
         y = Add() ([shortcut, convpath])
-        y = BatchNormalization(axis=-1) (y)
+        
+    else:
+        shortcut = AveragePooling2D(pool_size = (2, 2)) (x)
+        shortcut = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
+                          padding = 'same', use_bias = True) (shortcut)        
+        
+        convpath = x
+        convpath = LayerNorm() (x)
+        convpath = Activation('relu') (convpath)
+        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
+                                 use_bias = False, padding='same')(convpath)
+        convpath = AveragePooling2D(pool_size = (2, 2)) (convpath)
+        convpath = LayerNorm() (convpath)
+        convpath = Activation('relu') (convpath)
+        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
+                                 use_bias = True, padding='same') (convpath)        
+        y = Add() ([shortcut, convpath])
+        
     return y
 
 def make_generator():
@@ -127,35 +145,48 @@ def make_generator():
     
     NUMBER_OF_POSE_CHANNELS = 16
     
-    noise = Input((64 - NUMBER_OF_POSE_CHANNELS, ))
+    noise = Input((64, ))
     pose = Input((NUMBER_OF_POSE_CHANNELS, 2), dtype='int32')
-    
-    y = Dense((256 - NUMBER_OF_POSE_CHANNELS) * 8 * 4) (noise)
-    
-    y = Reshape((8, 4, 256 - NUMBER_OF_POSE_CHANNELS)) (y)  
-    y = BatchNormalization(axis=-1) (y)
-    y_pose = PoseMapFromCordinatesLayer((8, 4), (1, 1)) (pose)    
-    y = Concatenate(axis = -1) ([y, y_pose])
-    
-    y = resblock(y, (3, 3), 'UP', 256 - NUMBER_OF_POSE_CHANNELS)
-    y_pose = PoseMapFromCordinatesLayer((16, 8), (1, 1)) (pose)
-    y = Concatenate(axis = -1) ([y, y_pose])
-    
-    y = resblock(y, (3, 3), 'UP', 128 - NUMBER_OF_POSE_CHANNELS)
-    y_pose = PoseMapFromCordinatesLayer((32, 16), (3, 3)) (pose)
-    y = Concatenate(axis = -1) ([y, y_pose])
-                
-    y = resblock(y, (3, 3), 'UP', 64 - NUMBER_OF_POSE_CHANNELS)
-    y_pose = PoseMapFromCordinatesLayer((64, 32), (3, 3)) (pose)
-    y = Concatenate(axis = -1) ([y, y_pose])
-    
-    y = resblock(y, (3, 3), 'UP', 32 - NUMBER_OF_POSE_CHANNELS)
     y_pose = PoseMapFromCordinatesLayer((128, 64), (5, 5)) (pose)
-    y = Concatenate(axis = -1) ([y, y_pose])
+    y_pose_128_64 = Conv2D(64, (3, 3), kernel_initializer='he_uniform', use_bias = False, 
+                      padding='same')(y_pose)
+    y_pose_64_32 = resblock(y_pose_128_64, (3, 3), 'DOWN', 64)
+    y_pose_32_16 = resblock(y_pose_64_32, (3, 3), 'DOWN', 128)
+    y_pose_16_8 = resblock(y_pose_32_16, (3, 3), 'DOWN', 256)
     
+    y = Dense(256 * 8 * 4) (noise)
+    y = Reshape((8, 4, 256)) (y)   
+    
+    
+    y = resblock(y, (3, 3), 'UP', 256)
+    y = Concatenate(axis=-1) ([y, y_pose_16_8])
+    y = resblock(y, (3, 3), 'UP', 128)
+    y = Concatenate(axis=-1) ([y, y_pose_32_16])
+    y = resblock(y, (3, 3), 'UP', 64)
+    y = Concatenate(axis=-1) ([y, y_pose_64_32])
+    y = resblock(y, (3, 3), 'UP', 64)
+    y = Concatenate(axis=-1) ([y, y_pose_128_64])    
+  
     y = resblock(y, (3, 3), 'SAME', 64)
     
+    y = BatchNormalization(axis=-1) (y)
     y = Activation('relu') (y)
     y = Conv2D(3, (3, 3), kernel_initializer='he_uniform', use_bias = False, 
                       padding='same', activation='tanh')(y)
     return Model(inputs=[noise, pose], outputs=y) 
+
+
+def make_discriminator():
+    """Creates a discriminator model that takes an image as input and outputs a single value, representing whether
+    the input is real or generated."""
+    x = Input((128, 64, 3))
+    y = Conv2D(64, (3, 3), kernel_initializer='he_uniform',
+                      use_bias = True, padding='same') (x)
+    y = resblock(y, (3, 3), 'DOWN', 64)
+    y = resblock(y, (3, 3), 'DOWN', 128)
+    y = resblock(y, (3, 3), 'DOWN', 256)
+    y = resblock(y, (3, 3), 'DOWN', 512)
+    
+    y = Flatten()(y)
+    y = Dense(1, use_bias = False)(y)
+    return Model(inputs=x, outputs=y)

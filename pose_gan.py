@@ -32,7 +32,11 @@ class POSE_GAN(WGAN_GP):
 
         generator_model = Model(inputs=[self._generator_input, self._generator_input_pose],
                                 outputs=[discriminator_output_fake])
-        generator_model.compile(optimizer=self._generator_optimizer, loss=self._loss_generator())
+        
+        
+        generator_model.compile(optimizer=self._generator_optimizer,
+                                loss=self._loss_generator(), 
+                                metrics = [self.pose_loss_fn, self.wasenstein_loss_fn])
 
         return generator_model
     
@@ -51,13 +55,19 @@ class POSE_GAN(WGAN_GP):
     
     def _loss_generator(self):
         resize_layer = Lambda(lambda x: ktf.image.resize_images(x, (299, 299)))
-        def generator_loss(y_true, y_pred):
-            estimated_pose = self._pose_estimator (resize_layer(self._discriminator_fake_input))
-            true_pose = ktf.cast(self._generator_input_pose, 'float32')
-            pose_loss = self._pose_penalty_weight * K.mean((estimated_pose[:, ::2] -  true_pose[:, :, 1]) ** 2)
-            pose_loss += self._pose_penalty_weight * K.mean((estimated_pose[:, 1::2] -  true_pose[:, :, 0]) ** 2)
-            return -K.mean(y_pred) + pose_loss
-        return generator_loss
+        estimated_pose = self._pose_estimator (resize_layer(self._discriminator_fake_input))
+        true_pose = ktf.cast(self._generator_input_pose, 'float32')
+        pose_loss = self._pose_penalty_weight * K.mean((estimated_pose[:, ::2] -  true_pose[:, :, 1]) ** 2)
+        pose_loss += self._pose_penalty_weight * K.mean((estimated_pose[:, 1::2] -  true_pose[:, :, 0]) ** 2)
+        def pose_loss_fn(y_true, y_pred):
+            return pose_loss
+        def wasenstein_loss_fn(y_true, y_pred):
+            return -K.mean(y_pred)
+        def generator_loss_fn(y_true, y_pred):
+            return pose_loss_fn(y_true, y_pred) + wasenstein_loss_fn(y_true, y_pred)
+        self.pose_loss_fn = pose_loss_fn
+        self.wasenstein_loss_fn = wasenstein_loss_fn
+        return generator_loss_fn
     
     def compile_models(self):
         self._discriminator_fake_input = self._generator([self._generator_input, self._generator_input_pose])

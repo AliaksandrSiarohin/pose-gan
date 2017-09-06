@@ -114,3 +114,26 @@ class PoseDataset(FolderDataset):
         keypoints = np.concatenate([keypoints_y, keypoints_x], axis = 2)
         
         return noise, keypoints
+    
+    
+    def display(self, batch, pose = None, row=8, col=8):
+        image = super(FolderDataset, self).display(batch, row, col)
+        
+        height, width = batch.shape[1], batch.shape[2]
+        total_width, total_height = width * col, height * row
+        result_image = np.empty((total_height, total_width, batch.shape[3]))
+        batch_index = 0
+        for i in range(row):
+            for j in range(col):
+                image = np.copy(batch[batch_index])
+                if pose is not None:
+                    for joint_index in range(pose.shape[1]):
+                        joint_cord = pose[batch_index][joint_index]
+                        if joint_cord[0] >= height or joint_cord[1] >= width or joint_cord[0] < 0 or joint_cord[1] < 0:
+                            continue
+                        image[joint_cord[0], joint_cord[1]] = (1, 0, 0)
+                            
+                result_image[(i * height):((i+1)*height), (j * width):((j+1)*width)] = image
+                batch_index += 1
+        result_image = img_as_ubyte((result_image + 1) / 2)
+        return result_image

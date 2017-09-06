@@ -49,6 +49,7 @@ assert K.image_data_format() == 'channels_last'
 from pose_gan import POSE_GAN as GAN
 import pose_guided_architectures as architectures
 from dataset import PoseDataset as Dataset
+from pose_guided_architectures import LayerNorm, PoseMapFromCordinatesLayer
 
 from tqdm import tqdm
 from keras.models import load_model
@@ -70,18 +71,20 @@ def train():
     if args.generator_checkpoint is None:
         generator = architectures.make_generator()
     else:
-        generator = load_model(args.generator_checkpoint)    
+        generator = load_model(args.generator_checkpoint, custom_objects = 
+                                   {'PoseMapFromCordinatesLayer' : PoseMapFromCordinatesLayer,   'LayerNorm' : LayerNorm})    
     print ("Generator Summary:")
     generator.summary()
        
     if args.discriminator_checkpoint is None:
         discriminator = architectures.make_discriminator()
     else:
-        discriminator = load_model(args.discriminator_checkpoint)
+        discriminator = load_model(args.discriminator_checkpoint, custom_objects = 
+                                   {'PoseMapFromCordinatesLayer' : PoseMapFromCordinatesLayer,   'LayerNorm' : LayerNorm})
     print ("Discriminator Summary:")
     discriminator.summary()
     
-    noise_size = 48
+    noise_size = 64
     pose_size = (16, 2)
     image_size = (128, 64, 3)
     generator_model, discriminator_model = GAN(generator, discriminator, pose_estimator,
@@ -94,6 +97,10 @@ def train():
     
     gt_image = dataset.next_discriminator_sample()
     save_image(dataset.display(gt_image), args.output_dir, 'gt_data.png')
+    
+    noise_batch, pose_batch = dataset.next_generator_sample() 
+    image = dataset.display(generator.predict_on_batch([noise_batch, pose_batch]), pose_batch)
+    save_image(image, args.output_dir, 'epoch_{}.png'.format(0))
   
     for epoch in range(args.number_of_epochs):        
         print("Epoch: ", epoch)
@@ -112,12 +119,14 @@ def train():
             noise_batch, pose_batch = dataset.next_generator_sample()
             loss = generator_model.train_on_batch([noise_batch, pose_batch], np.zeros([args.batch_size]))
             generator_loss_list.append(loss)
-           
-        print ("Discriminator loss: ", np.mean(discriminator_loss_list))
-        print ("Generator loss: ", np.mean(generator_loss_list))
+            
+          
+        print ("Discriminator loss: ", np.mean(np.array(discriminator_loss_list), axis = 0))
+        print ("Generator loss: ", np.mean(np.array(generator_loss_list), axis = 0))
         
-        if (epoch + 1) % args.display_ratio == 0:            
-            image = dataset.display(generator.predict_on_batch(list(dataset.next_generator_sample())))
+        if (epoch + 1) % args.display_ratio == 0:
+            noise_batch, pose_batch = dataset.next_generator_sample() 
+            image = dataset.display(generator.predict_on_batch([noise_batch, pose_batch]), pose_batch)
             save_image(image, args.output_dir, 'epoch_{}.png'.format(epoch))
         
         
