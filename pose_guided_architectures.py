@@ -86,7 +86,7 @@ class PoseMapFromCordinatesLayer(Layer):
     
 
     
-def resblock(x, kernel_size, resample, nfilters):
+def resblock(x, kernel_size, resample, nfilters, norm = BatchNormalization):
     assert resample in ["UP", "SAME", "DOWN"]
    
     if resample == "UP":
@@ -94,12 +94,12 @@ def resblock(x, kernel_size, resample, nfilters):
         shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
                           kernel_initializer='he_uniform', use_bias = True) (shortcut)
                 
-        convpath = BatchNormalization(axis=-1) (x)
+        convpath = norm() (x)
         convpath = Activation('relu') (convpath)
         convpath = UpSampling2D(size=(2, 2))(convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
                                  use_bias = False, padding='same')(convpath)        
-        convpath = BatchNormalization(axis=-1) (convpath)
+        convpath = norm() (convpath)
         convpath = Activation('relu') (convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
                                  use_bias = True, padding='same') (convpath)
@@ -109,11 +109,11 @@ def resblock(x, kernel_size, resample, nfilters):
         shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
                           kernel_initializer='he_uniform', use_bias = True) (x)
                 
-        convpath = BatchNormalization(axis=-1) (x)
+        convpath = norm() (x)
         convpath = Activation('relu') (convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
                                  use_bias = False, padding='same')(convpath)        
-        convpath = BatchNormalization(axis=-1) (convpath)
+        convpath = norm() (convpath)
         convpath = Activation('relu') (convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
                                  use_bias = True, padding='same') (convpath)
@@ -126,12 +126,12 @@ def resblock(x, kernel_size, resample, nfilters):
                           padding = 'same', use_bias = True) (shortcut)        
         
         convpath = x
-        convpath = LayerNorm() (x)
+        convpath = norm() (x)
         convpath = Activation('relu') (convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
                                  use_bias = False, padding='same')(convpath)
         convpath = AveragePooling2D(pool_size = (2, 2)) (convpath)
-        convpath = LayerNorm() (convpath)
+        convpath = norm() (convpath)
         convpath = Activation('relu') (convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
                                  use_bias = True, padding='same') (convpath)        
@@ -139,14 +139,20 @@ def resblock(x, kernel_size, resample, nfilters):
         
     return y
 
+
+NUMBER_OF_POSE_CHANNELS = 16
+
 def make_generator():
-    """Creates a generator model that takes a 48-dimensional noise vector as a "seed" and pose indices, and outputs images
-    of size 128x64x3."""
-    
-    NUMBER_OF_POSE_CHANNELS = 16
-    
+    """Creates a generator model that takes a 64-dimensional noise vector as a "seed" and pose indices, and outputs images
+    of size 128x64x3."""   
     noise = Input((64, ))
     pose = Input((NUMBER_OF_POSE_CHANNELS, 2), dtype='int32')
+    pose_vec = Lambda(lambda x: ktf.cast(x, 'float32') / np.expand_dims(np.array([128.0, 64.0]), axis=0)) (pose)
+    pose_vec = Reshape((NUMBER_OF_POSE_CHANNELS * 2,))(pose_vec)
+    pose_vec = Dense(64, activation = 'relu') (pose_vec)
+    pose_vec = Dense(128, activation = 'relu') (pose_vec)
+    
+    
     y_pose = PoseMapFromCordinatesLayer((128, 64), (5, 5)) (pose)
     y_pose_128_64 = Conv2D(64, (3, 3), kernel_initializer='he_uniform', use_bias = False, 
                       padding='same')(y_pose)
@@ -154,7 +160,8 @@ def make_generator():
     y_pose_32_16 = resblock(y_pose_64_32, (3, 3), 'DOWN', 128)
     y_pose_16_8 = resblock(y_pose_32_16, (3, 3), 'DOWN', 256)
     
-    y = Dense(256 * 8 * 4) (noise)
+    y = Concatenate(axis=-1) ([noise, pose_vec])
+    y = Dense(256 * 8 * 4) (y)
     y = Reshape((8, 4, 256)) (y)   
     
     
@@ -179,14 +186,23 @@ def make_generator():
 def make_discriminator():
     """Creates a discriminator model that takes an image as input and outputs a single value, representing whether
     the input is real or generated."""
-    x = Input((128, 64, 3))
-    y = Conv2D(64, (3, 3), kernel_initializer='he_uniform',
-                      use_bias = True, padding='same') (x)
-    y = resblock(y, (3, 3), 'DOWN', 64)
-    y = resblock(y, (3, 3), 'DOWN', 128)
-    y = resblock(y, (3, 3), 'DOWN', 256)
-    y = resblock(y, (3, 3), 'DOWN', 512)
+    image = Input((128, 64, 3))
+    pose = Input((NUMBER_OF_POSE_CHANNELS, 2), dtype='int32')
+    
+    y_pose = PoseMapFromCordinatesLayer((128, 64), (5, 5)) (pose)
+    y_pose = Conv2D(32, (3, 3), kernel_initializer='he_uniform', use_bias = False, 
+                      padding='same')(y_pose)
+    
+    y = Conv2D(32, (3, 3), kernel_initializer='he_uniform',
+                      use_bias = True, padding='same') (image)
+    
+    y = Concatenate(axis=-1)  ([y, y_pose])
+    
+    y = resblock(y, (3, 3), 'DOWN', 64, LayerNorm)    
+    y = resblock(y, (3, 3), 'DOWN', 128, LayerNorm)
+    y = resblock(y, (3, 3), 'DOWN', 256, LayerNorm)
+    y = resblock(y, (3, 3), 'DOWN', 512, LayerNorm)
     
     y = Flatten()(y)
     y = Dense(1, use_bias = False)(y)
-    return Model(inputs=x, outputs=y)
+    return Model(inputs=[image, pose], outputs=y)

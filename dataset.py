@@ -96,29 +96,41 @@ class FolderDataset(UGANDataset):
     
 import pandas as pd
 import json
-class PoseDataset(FolderDataset):
+class PoseDataset(UGANDataset):
     def __init__(self, input_dir, batch_size, noise_size, image_size, pose_anotations):
-        super(PoseDataset, self).__init__(input_dir, batch_size, noise_size, image_size)
+        super(PoseDataset, self).__init__(batch_size, noise_size)
+        self._image_size = image_size
         self._pose_anotations_df = pd.read_csv(pose_anotations, sep = ':')
-    def next_generator_sample(self):
-        noise = super(PoseDataset, self).next_generator_sample()
+        self._batches_before_shuffle = int(len(self._pose_anotations_df) // self._batch_size)        
+        self._input_dir = input_dir
         
-        sample_index = np.random.choice(len(self._pose_anotations_df), size = 64)        
+    def _extract_keypoints_array(self, sample_index):
         keypoints_x = np.array([json.loads(keypoints) 
                         for keypoints in self._pose_anotations_df.iloc[sample_index]['keypoints_x']])
         keypoints_y = np.array([json.loads(keypoints) 
                         for keypoints in self._pose_anotations_df.iloc[sample_index]['keypoints_y']])
         keypoints_x = np.expand_dims(keypoints_x, 2)
         keypoints_y = np.expand_dims(keypoints_y, 2)
-
         keypoints = np.concatenate([keypoints_y, keypoints_x], axis = 2)
+        return keypoints
         
-        return noise, keypoints
+    def next_generator_sample(self):
+        noise = super(PoseDataset, self).next_generator_sample()        
+        sample_index = np.random.choice(len(self._pose_anotations_df), size = 64)        
+        keypoints = self._extract_keypoints_array(sample_index)        
+        return noise, keypoints    
     
+    def _load_discriminator_data(self, index):
+        images_batch = np.array([resize(plt.imread(os.path.join(self._input_dir, img_name)), self._image_size) * 2 - 1
+                                 for img_name in self._pose_anotations_df.iloc[index]['name']])
+        keypoints = self._extract_keypoints_array(index)
+        return images_batch, keypoints
     
-    def display(self, batch, pose = None, row=8, col=8):
-        image = super(FolderDataset, self).display(batch, row, col)
+    def _shuffle_discriminator_data(self):
+        self._pose_anotations_df = self._pose_anotations_df.sample(frac=1)
+
         
+    def display(self, batch, pose = None, row=8, col=8):       
         height, width = batch.shape[1], batch.shape[2]
         total_width, total_height = width * col, height * row
         result_image = np.empty((total_height, total_width, batch.shape[3]))

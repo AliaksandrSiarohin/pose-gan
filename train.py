@@ -53,6 +53,9 @@ from pose_guided_architectures import LayerNorm, PoseMapFromCordinatesLayer
 
 from tqdm import tqdm
 from keras.models import load_model
+import tensorflow as tf
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
 
 def save_image(image, output_directory, title):
     if not os.path.exists(output_directory):
@@ -64,7 +67,7 @@ def save_model(model, output_directory, title):
         os.makedirs(output_directory)
     model.save(os.path.join(output_directory, title))
     
-def train():
+def train():   
     K.set_learning_phase(1)
     pose_estimator = load_model(args.pose_estimator)
     
@@ -89,14 +92,14 @@ def train():
     image_size = (128, 64, 3)
     generator_model, discriminator_model = GAN(generator, discriminator, pose_estimator,
                                                Input(shape=(noise_size, )), Input(shape=pose_size, dtype='int32'),
-                                               Input(shape=image_size),
+                                               Input(shape=image_size), Input(shape=pose_size, dtype='int32'),
                                                cmd_args = args ).compile_models()
     
     dataset = Dataset(batch_size = args.batch_size, noise_size = noise_size, 
                       input_dir=args.input_folder, image_size=image_size[:2], pose_anotations=args.pose_anotations)
     
-    gt_image = dataset.next_discriminator_sample()
-    save_image(dataset.display(gt_image), args.output_dir, 'gt_data.png')
+    gt_image, gt_pose = dataset.next_discriminator_sample()
+    save_image(dataset.display(gt_image, gt_pose), args.output_dir, 'gt_data.png')
     
     noise_batch, pose_batch = dataset.next_generator_sample() 
     image = dataset.display(generator.predict_on_batch([noise_batch, pose_batch]), pose_batch)
@@ -109,10 +112,11 @@ def train():
         
         for i in tqdm(range(int(dataset._batches_before_shuffle // args.training_ratio))):
             for j in range(args.training_ratio):
-                image_batch = dataset.next_discriminator_sample()
-                noise_batch, pose_batch = dataset.next_generator_sample()
+                image_batch, pose_discriminator_batch = dataset.next_discriminator_sample()
+                noise_batch, pose_generator_batch = dataset.next_generator_sample()
                 #All zeros as ground truth because it`s not used
-                loss = discriminator_model.train_on_batch([image_batch, noise_batch, pose_batch],
+                loss = discriminator_model.train_on_batch([image_batch, pose_discriminator_batch, 
+                                                           noise_batch, pose_generator_batch],
                                                           np.zeros([args.batch_size]))
                 discriminator_loss_list.append(loss)
             
