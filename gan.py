@@ -15,8 +15,10 @@ class GAN(object):
                  cmd_args=None):
         self._generator = generator
         self._discriminator = discriminator
+               
         self._generator_optimizer = generator_optimizer
         self._discriminator_optimizer = discriminator_optimizer
+        
         self._generator_input = generator_input
         self._discriminator_input = discriminator_input
         self._batch_size = cmd_args.batch_size

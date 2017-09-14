@@ -32,7 +32,7 @@ class POSE_GAN(WGAN_GP):
         self._set_trainable(self._generator, True)
         self._set_trainable(self._discriminator, False)
 
-        discriminator_output_fake = self._discriminator([self._discriminator_fake_input, self._generator_input_pose])
+        discriminator_output_fake = self._discriminator([self._discriminator_fake_input])
         generator_model = Model(inputs=[self._generator_input, self._generator_input_pose],
                                 outputs=[discriminator_output_fake])
         
@@ -52,7 +52,7 @@ class POSE_GAN(WGAN_GP):
 
         discriminator_model = Model(inputs=[self._discriminator_input, self._discriminator_input_pose,
                                             self._generator_input, self._generator_input_pose],
-                                    outputs=[self._discriminator([disc_in, disc_in_pose])])
+                                    outputs=[self._discriminator([disc_in])])
         discriminator_model.compile(optimizer=self._discriminator_optimizer, loss=self._loss_discriminator(),
                                    metrics = [self.gp_loss_fn, self.discriminator_wasenstein_loss_fn])
 
@@ -60,11 +60,8 @@ class POSE_GAN(WGAN_GP):
     
     
     def _loss_generator(self):
-        resize_layer = Lambda(lambda x: ktf.image.resize_images(x, (299, 299)))
-        estimated_pose = self._pose_estimator (resize_layer(self._discriminator_fake_input))
-        true_pose = ktf.cast(self._generator_input_pose, 'float32')
-        pose_loss = self._pose_penalty_weight * K.mean((estimated_pose[:, ::2] -  true_pose[:, :, 1]) ** 2)
-        pose_loss += self._pose_penalty_weight * K.mean((estimated_pose[:, 1::2] -  true_pose[:, :, 0]) ** 2)
+        estimated_pose = self._pose_estimator (self._discriminator_fake_input[..., ::-1] / 2) [1]
+        pose_loss = self._pose_penalty_weight * K.mean((estimated_pose[..., :18] -  self._generator_input_pose) ** 2)
         def pose_loss_fn(y_true, y_pred):
             return pose_loss
         def wasenstein_loss_fn(y_true, y_pred):
@@ -80,15 +77,11 @@ class POSE_GAN(WGAN_GP):
         real = self._discriminator_input
         fake = self._discriminator_fake_input
         
-        pose_discriminator = ktf.cast(self._discriminator_input_pose, 'float32')
-        pose_generator = ktf.cast(self._generator_input_pose, 'float32')
         weights = K.random_uniform((self._batch_size, 1, 1, 1))
         averaged_samples = (weights * real) + ((1 - weights) * fake)
-        weights = ktf.reshape(weights, (self._batch_size, 1, 1))
-        averaged_pose = (weights * pose_discriminator)  + ((1 - weights) * pose_generator)
-        averaged_pose = ktf.cast(averaged_pose, 'int32')
-        
-        gradients = K.gradients(K.sum(self._discriminator([averaged_samples, averaged_pose])), averaged_samples)[0]
+        averaged_pose = (weights * self._discriminator_input_pose)  + ((1 - weights) * self._generator_input_pose)
+
+        gradients = K.gradients(K.sum(self._discriminator([averaged_samples])), averaged_samples)[0]
         gradients = K.reshape(gradients, (self._batch_size, -1))
         gradient_l2_norm = K.sqrt(K.sum(K.square(gradients), axis = 1))
         gradient_penalty = self._gradient_penalty_weight * K.square(1 - gradient_l2_norm)

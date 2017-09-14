@@ -27,11 +27,13 @@ def get_args():
     parser.add_argument("--checkpoint_ratio", default=10, type=int, help="Number of epochs between consecutive checkpoints")
     parser.add_argument("--generator_checkpoint", default=None, help="Previosly saved model of generator")
     parser.add_argument("--discriminator_checkpoint", default=None, help="Previosly saved model of discriminator")
-    parser.add_argument("--pose_estimator", default="pose-anotations/pose_estimator.h5", help="InceptionV3 based pose estimator")
-    parser.add_argument("--pose_penalty_weight", default=0.1, type=int, help="Weight of pose penalty")
+    parser.add_argument("--pose_estimator", default="cao-hpe/pose_estimator.h5", help="InceptionV3 based pose estimator")
+    parser.add_argument("--pose_penalty_weight", default=1000, type=int, help="Weight of pose penalty")
     parser.add_argument("--pose_anotations", default='pose-anotations/pose_anotations.csv', help="Csv file with pose anotations")
     parser.add_argument("--input_folder", default='../market-dataset/bounding_box_train', help='Folder with real images for training')
-    parser.add_argument("--display_ratio", default=1,  help='Number of epochs between ploting')
+    parser.add_argument("--pose_folder", default='cao-hpe/annotations', help='Folder pose annotations')
+    parser.add_argument("--display_ratio", default=1, type=int,  help='Number of epochs between ploting')
+    parser.add_argument("--start_epoch", default=0, type=int, help='Start epoch for starting from checkpoint')
     args = parser.parse_args()
     return args
 
@@ -48,7 +50,7 @@ assert K.image_data_format() == 'channels_last'
 
 from pose_gan import POSE_GAN as GAN
 import pose_guided_architectures as architectures
-from dataset import PoseDataset as Dataset
+from dataset import PoseHMDataset as Dataset
 from pose_guided_architectures import LayerNorm, PoseMapFromCordinatesLayer
 
 from tqdm import tqdm
@@ -71,32 +73,37 @@ def train():
     K.set_learning_phase(1)
     pose_estimator = load_model(args.pose_estimator)
     
+    noise_size = (64, )
+    pose_size = (16, 8, 18)
+    image_size = (128, 64, 3)
+    
+    noise_input = Input(shape=noise_size)
+    pose_input_generator = Input(shape=pose_size)
+    pose_input_discriminator = Input(shape=pose_size)
+    image_input = Input(shape=image_size)
+    
     if args.generator_checkpoint is None:
-        generator = architectures.make_generator()
+        generator = architectures.make_generator(noise_input, pose_input_generator)
     else:
-        generator = load_model(args.generator_checkpoint, custom_objects = 
-                                   {'PoseMapFromCordinatesLayer' : PoseMapFromCordinatesLayer,   'LayerNorm' : LayerNorm})    
+        generator = load_model(args.generator_checkpoint, custom_objects = {'LayerNorm' : LayerNorm})    
     print ("Generator Summary:")
     generator.summary()
        
     if args.discriminator_checkpoint is None:
-        discriminator = architectures.make_discriminator()
+        discriminator = architectures.make_discriminator(image_input, pose_input_discriminator)
     else:
-        discriminator = load_model(args.discriminator_checkpoint, custom_objects = 
-                                   {'PoseMapFromCordinatesLayer' : PoseMapFromCordinatesLayer,   'LayerNorm' : LayerNorm})
+        discriminator = load_model(args.discriminator_checkpoint, custom_objects = {'LayerNorm' : LayerNorm})  
     print ("Discriminator Summary:")
     discriminator.summary()
     
-    noise_size = 64
-    pose_size = (16, 2)
-    image_size = (128, 64, 3)
+
     generator_model, discriminator_model = GAN(generator, discriminator, pose_estimator,
-                                               Input(shape=(noise_size, )), Input(shape=pose_size, dtype='int32'),
-                                               Input(shape=image_size), Input(shape=pose_size, dtype='int32'),
+                                               noise_input, pose_input_generator,
+                                               image_input, pose_input_discriminator,
                                                cmd_args = args ).compile_models()
     
-    dataset = Dataset(batch_size = args.batch_size, noise_size = noise_size, 
-                      input_dir=args.input_folder, image_size=image_size[:2], pose_anotations=args.pose_anotations)
+    dataset = Dataset(batch_size=args.batch_size, noise_size=noise_size, 
+                      image_dir=args.input_folder, pose_dir=args.pose_folder)
     
     gt_image, gt_pose = dataset.next_discriminator_sample()
     save_image(dataset.display(gt_image, gt_pose), args.output_dir, 'gt_data.png')
@@ -105,7 +112,7 @@ def train():
     image = dataset.display(generator.predict_on_batch([noise_batch, pose_batch]), pose_batch)
     save_image(image, args.output_dir, 'epoch_{}.png'.format(0))
   
-    for epoch in range(args.number_of_epochs):        
+    for epoch in range(args.start_epoch, args.start_epoch + args.number_of_epochs):        
         print("Epoch: ", epoch)
         discriminator_loss_list = []
         generator_loss_list = []

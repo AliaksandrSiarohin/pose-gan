@@ -94,6 +94,63 @@ class FolderDataset(UGANDataset):
         image = img_as_ubyte((image + 1) / 2)
         return image
     
+    
+class PoseHMDataset(UGANDataset):
+    def __init__(self, image_dir, pose_dir, batch_size, noise_size):
+        super(PoseHMDataset, self).__init__(batch_size, noise_size)
+        self._image_names = np.array(os.listdir(image_dir))
+        self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)
+        self._pose_dir = pose_dir
+        self._image_dir = image_dir
+        
+    def _load_pose_array(self, index):
+        names = self._image_names[index]
+        return np.array([np.load(os.path.join(self._pose_dir, name + '.npy')) for name in names], dtype='float32')[..., :18]   
+        
+    def next_generator_sample(self):
+        index = np.random.choice(self._image_names.shape[0], size = self._batch_size)
+        noise = np.random.normal(size=(self._batch_size, ) + self._noise_size)
+        return noise, self._load_pose_array(index)
+    
+    def _load_discriminator_data(self, index):
+        images = np.array([2 * (plt.imread(os.path.join(self._image_dir, img_name))/255.0 - 0.5)
+                           for img_name in self._image_names[index]])
+        poses = self._load_pose_array(index)
+        return images, poses
+    
+    
+    def _shuffle_discriminator_data(self):
+        np.random.shuffle(self._image_names)
+        
+    def display(self, batch, pose = None, row=8, col=8):
+        if len(pose.shape) == 4:
+            new_pose = np.empty((pose.shape[0], pose.shape[-1], 2), dtype='int32')
+            for i in range(pose.shape[0]):
+                m = resize(pose[i], (128, 64), order=1, preserve_range = True)
+                y, x, _ = np.where(m == m.max(axis = (0, 1)))
+                new_pose[i,:,0] = y
+                new_pose[i,:,1] = x
+            pose = new_pose
+        height, width = batch.shape[1], batch.shape[2]
+        total_width, total_height = width * col, height * row
+        result_image = np.empty((total_height, total_width, batch.shape[3]))
+        batch_index = 0
+        for i in range(row):
+            for j in range(col):
+                image = np.copy(batch[batch_index])
+                if pose is not None:
+                    for joint_index in range(pose.shape[1]):
+                        joint_cord = pose[batch_index][joint_index]
+                        if joint_cord[0] >= height or joint_cord[1] >= width or joint_cord[0] < 0 or joint_cord[1] < 0:
+                            continue
+                        image[joint_cord[0], joint_cord[1]] = (1, 0, 0)
+                            
+                result_image[(i * height):((i+1)*height), (j * width):((j+1)*width)] = image
+                batch_index += 1
+        result_image = img_as_ubyte((result_image + 1) / 2)
+        return result_image
+    
+    
 import pandas as pd
 import json
 class PoseDataset(UGANDataset):
@@ -116,7 +173,7 @@ class PoseDataset(UGANDataset):
         
     def next_generator_sample(self):
         noise = super(PoseDataset, self).next_generator_sample()        
-        sample_index = np.random.choice(len(self._pose_anotations_df), size = 64)        
+        sample_index = np.random.choice(len(self._pose_anotations_df), size = self._batch_size)       
         keypoints = self._extract_keypoints_array(sample_index)        
         return noise, keypoints    
     
