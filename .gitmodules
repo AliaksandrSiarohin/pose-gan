@@ -1,0 +1,3 @@
+[submodule "gan"]
+	path = gan
+	url = https://github.com/AliaksandrSiarohin/gan.git
