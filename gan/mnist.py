@@ -4,6 +4,12 @@ from keras.layers.convolutional import Convolution2D, Conv2DTranspose
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 
+from wgan_gp import WGAN_GP
+from dataset import ArrayDataset
+from cmd import parser_with_default_args
+from train import Trainer
+
+import numpy as np
 
 def make_generator():
     """Creates a generator model that takes a 100-dimensional noise vector as a "seed", and outputs images
@@ -50,3 +56,34 @@ def make_discriminator():
     model.add(LeakyReLU())
     model.add(Dense(1, kernel_initializer='he_normal'))
     return model
+
+class MNISTDataset(ArrayDataset):
+    def __init__(self, batch_size, noise_size = (100, )):
+        from keras.datasets import mnist
+        (X_train, y_train), (X_test, y_test) = mnist.load_data()
+        X = np.concatenate((X_train, X_test), axis=0)
+        X = X.reshape((X.shape[0], X.shape[1], X.shape[2], 1))
+        X = (X.astype(np.float32) - 127.5) / 127.5
+        super(MNISTDataset, self).__init__(X, batch_size, noise_size)
+        
+    def display(self, output_batch, input_batch = None, row=8, col=8):
+        batch = output_batch
+        image = super(MNISTDataset, self).display(batch, row, col)
+        image = (image * 127.5) + 127.5
+        image = np.squeeze(np.round(image).astype(np.uint8))
+        return image
+
+def main():
+    generator = make_generator()
+    discriminator = make_discriminator()
+    
+    args = parser_with_default_args().parse_args()
+    dataset = MNISTDataset(args.batch_size)
+    gan = WGAN_GP('output/checkpoints/epoch_019_generator.png',
+                  'output/checkpoints/epoch_019_discriminator.png', **vars(args))
+    trainer = Trainer(dataset, gan, **vars(args))
+    
+    trainer.train()
+
+if __name__ == "__main__":
+    main()

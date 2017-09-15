@@ -10,6 +10,8 @@ from keras.engine.topology import Layer, InputSpec
 from keras import initializers
 from keras.backend import tf as ktf
 
+import numpy as np
+
 class LayerNorm(Layer):
     def __init__(self, epsilon=1e-7, beta_init='zero', gamma_init='one', **kwargs):
         self.beta_init = initializers.get(beta_init)
@@ -43,88 +45,55 @@ class LayerNorm(Layer):
 
 
 
-def resblock(x, kernel_size, resample, nfilters):
-    assert resample in ["UP", "DOWN", "SAME"]
+def resblock(x, kernel_size, resample, nfilters, norm = BatchNormalization):
+    assert resample in ["UP", "SAME", "DOWN"]
    
-    if resample == "DOWN":
+    if resample == "UP":
+        shortcut = UpSampling2D(size=(2, 2)) (x)        
+        shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
+                          kernel_initializer='he_uniform', use_bias = True) (shortcut)
+                
+        convpath = norm() (x)
+        convpath = Activation('relu') (convpath)
+        convpath = UpSampling2D(size=(2, 2))(convpath)
+        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
+                                 use_bias = False, padding='same')(convpath)        
+        convpath = norm() (convpath)
+        convpath = Activation('relu') (convpath)
+        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
+                                 use_bias = True, padding='same') (convpath)
+        
+        y = Add() ([shortcut, convpath])
+    elif resample == "SAME":      
+        shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
+                          kernel_initializer='he_uniform', use_bias = True) (x)
+                
+        convpath = norm() (x)
+        convpath = Activation('relu') (convpath)
+        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
+                                 use_bias = False, padding='same')(convpath)        
+        convpath = norm() (convpath)
+        convpath = Activation('relu') (convpath)
+        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
+                                 use_bias = True, padding='same') (convpath)
+        
+        y = Add() ([shortcut, convpath])
+        
+    else:
         shortcut = AveragePooling2D(pool_size = (2, 2)) (x)
         shortcut = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
                           padding = 'same', use_bias = True) (shortcut)        
         
         convpath = x
-        convpath = LayerNorm() (x)
+        convpath = norm() (x)
         convpath = Activation('relu') (convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
                                  use_bias = False, padding='same')(convpath)
         convpath = AveragePooling2D(pool_size = (2, 2)) (convpath)
-        convpath = LayerNorm() (convpath)
+        convpath = norm() (convpath)
         convpath = Activation('relu') (convpath)
         convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
                                  use_bias = True, padding='same') (convpath)        
         y = Add() ([shortcut, convpath])
-    elif resample == "UP":
-        shortcut = UpSampling2D(size=(2, 2)) (x)        
-        shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
-                          kernel_initializer='he_uniform', use_bias = True) (shortcut)
-                
-        convpath = BatchNormalization(axis=-1) (x)
-        convpath = Activation('relu') (convpath)
-        convpath = UpSampling2D(size=(2, 2))(convpath)
-        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
-                                 use_bias = False, padding='same')(convpath)        
-        convpath = BatchNormalization(axis=-1) (convpath)
-        convpath = Activation('relu') (convpath)
-        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
-                                 use_bias = True, padding='same') (convpath)
         
-        y = Add() ([shortcut, convpath])
-    else:      
-        shortcut = Conv2D(nfilters, kernel_size, padding = 'same',
-                          kernel_initializer='he_uniform', use_bias = True) (x)
-                
-        convpath = BatchNormalization(axis=-1) (x)
-        convpath = Activation('relu') (convpath)
-        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform', 
-                                 use_bias = False, padding='same')(convpath)        
-        convpath = BatchNormalization(axis=-1) (convpath)
-        convpath = Activation('relu') (convpath)
-        convpath = Conv2D(nfilters, kernel_size, kernel_initializer='he_uniform',
-                                 use_bias = True, padding='same') (convpath)
-        
-        y = Add() ([shortcut, convpath])
     return y
-
-def make_generator():
-    """Creates a generator model that takes a 128-dimensional noise vector as a "seed", and outputs images
-    of size 128x64x3."""
-    x = Input((128, ))
-    y = Dense(512 * 8 * 4) (x)
-    y = Reshape((8, 4, 512)) (y)
-    
-    y = resblock(y, (3, 3), 'UP', 512)
-    y = resblock(y, (3, 3), 'UP', 256)
-    y = resblock(y, (3, 3), 'UP', 128)
-    y = resblock(y, (3, 3), 'UP', 64)
-    
-    y = BatchNormalization(axis=-1) (y)
-    y = Activation('relu') (y)
-    y = Conv2D(3, (3, 3), kernel_initializer='he_uniform', use_bias = False, 
-                      padding='same', activation='tanh')(y)
-    return Model(inputs=x, outputs=y) 
-
-
-def make_discriminator():
-    """Creates a discriminator model that takes an image as input and outputs a single value, representing whether
-    the input is real or generated."""
-    x = Input((128, 64, 3))
-    y = Conv2D(64, (3, 3), kernel_initializer='he_uniform',
-                      use_bias = True, padding='same') (x)
-    y = resblock(y, (3, 3), 'DOWN', 128)
-    y = resblock(y, (3, 3), 'DOWN', 256)
-    y = resblock(y, (3, 3), 'DOWN', 512)
-    y = resblock(y, (3, 3), 'DOWN', 512)
-    
-    y = Flatten()(y)
-    y = Dense(1, use_bias = False)(y)
-    return Model(inputs=x, outputs=y)
-
