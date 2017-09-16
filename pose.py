@@ -12,7 +12,7 @@ def main():
     discriminator = make_discriminator(Input((128, 64, 3)))    
     
     parser = parser_with_default_args()
-    parser.add_argument("--pose_model", default="cao-hpe/pose_estimator.h5", help="InceptionV3 based pose estimator")
+    parser.add_argument("--pose_model", default="cao-hpe/pose_estimator.h5", help="Pose estimator")
     parser.add_argument("--pose_penalty_weight", default=1000, type=int, help="Weight of pose penalty")
     parser.add_argument("--pose_folder", default='cao-hpe/annotations', help='Folder pose annotations')
     
