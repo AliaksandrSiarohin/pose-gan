@@ -68,7 +68,7 @@ def map_to_cord(pose_map, threshold = 0.1):
     return np.concatenate([np.expand_dims(y_values, -1), np.expand_dims(x_values, -1)], axis=1)
 
 
-def cords_to_map(cords, img_size, sigma=6.3):
+def cords_to_map(cords, img_size, sigma=6):
     result = np.zeros(img_size + cords.shape[0:1], dtype='float32')
     for i, point in enumerate(cords):
         if point[0] == MISSING_VALUE or point[1] == MISSING_VALUE:
@@ -112,6 +112,13 @@ def load_pose_cords_from_strings(y_str, x_str):
     x_cords = json.loads(x_str)
     return np.concatenate([np.expand_dims(y_cords, -1), np.expand_dims(x_cords, -1)], axis=1)
 
+def mean_inputation(X):
+    X = X.copy()
+    for i in range(X.shape[1]):
+        for j in range(X.shape[2]):
+            val = np.mean(X[:, i, j][X[:, i, j] != -1])
+            X[:, i, j][X[:, i, j] == -1] = val
+    return X
 
 def draw_legend():
     handles = [mpatches.Patch(color=np.array(color) / 255.0, label=name) for color, name in zip(COLORS, LABELS)]

@@ -9,20 +9,34 @@ from skimage.transform import resize
 from skimage import img_as_ubyte
 from gan.dataset import FolderDataset
 
+from structure import StuctureDataset
+import pose_utils
+import pandas as pd
+
 class PoseHMDataset(FolderDataset):
-    def __init__(self, image_dir, pose_dir, batch_size, noise_size, image_size):
+    def __init__(self, image_dir, pose_generator, batch_size, noise_size, image_size):
         super(PoseHMDataset, self).__init__(image_dir, batch_size, noise_size, image_size)
         self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)
-        self._pose_dir = pose_dir
+        self._pose_generator = pose_generator
         
-    def _load_pose_array(self, index):
-        names = self._image_names[index]
-        return np.array([np.load(os.path.join(self._pose_dir, name + '.npy')) for name in names], dtype='float32')[..., :18]   
+    def _deprocess_pose_array(self, X):
+        X = X / 2 + 0.5
+        X = X.reshape((X.shape[0], 18, 2))
+        X[...,0] *= self._image_size[0] - 0.1
+        X[...,1] *= self._image_size[1] - 0.1
+        return X
+    
+    def _load_pose_array(self, joints, for_disc=False):
+        pose_list = [resize(pose_utils.cords_to_map(joint, self._image_size), 
+                        (self._image_size[0] / 8, self._image_size[1] / 8), preserve_range=True) for joint in joints]
+        return np.array(pose_list)
         
     def next_generator_sample(self):
         index = np.random.choice(self._image_names.shape[0], size = self._batch_size)
+        joints = self._deprocess_pose_array(self._pose_generator.predict(np.random.normal(size = (self._batch_size,64) ))) 
         noise = super(PoseHMDataset, self).next_generator_sample()[0]
-        return [noise, self._load_pose_array(index)]
+        pose_array = self._load_pose_array(joints)
+        return [noise, pose_array]
     
     def _shuffle_discriminator_data(self):
         np.random.shuffle(self._image_names)

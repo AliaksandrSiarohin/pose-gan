@@ -113,17 +113,9 @@ class StuctureDataset(ArrayDataset):
         X = []
         for index, row in df.iterrows():
             X.append(pose_utils.load_pose_cords_from_strings(row['keypoints_y'], row['keypoints_x']))
-        X = self._mean_inputation(np.array(X, dtype='float32'))
+        X = pose_utils.mean_inputation(np.array(X, dtype='float32'))
         X = self._preprocess_array(X)
         super(StuctureDataset, self).__init__(X, batch_size, noise_size)
-
-    def _mean_inputation(self, X):
-        X = X.copy()
-        for i in range(X.shape[1]):
-            for j in range(X.shape[2]):
-                val = np.mean(X[:, i, j][X[:, i, j] != -1])
-                X[:, i, j][X[:, i, j] == -1] = val
-        return X
 
     def _preprocess_array(self, X):
         X[:,:,0] /= self._img_size[0]
