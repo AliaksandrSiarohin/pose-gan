@@ -38,38 +38,33 @@ class PoseHMDataset(FolderDataset):
         pose_array = self._load_pose_array(joints)
         return [noise, pose_array]
     
-    def _shuffle_discriminator_data(self):
-        np.random.shuffle(self._image_names)
+    def _load_discriminator_data(self, index):
+        images_batch_128_64 = super(PoseHMDataset, self)._load_discriminator_data(index)[0]
+        images_batch_64_32 = np.array([resize(img, (img.shape[0] / 2, img.shape[1] / 2), preserve_range=True)  
+                              for img in images_batch_128_64])
+        images_batch_32_16 = np.array([resize(img, (img.shape[0] / 4, img.shape[1] / 4), preserve_range=True)  
+                              for img in images_batch_128_64])
+        return [images_batch_128_64, images_batch_64_32, images_batch_32_16]
         
     def display(self, output_batch, input_batch, row=8, col=8):
-        batch = output_batch
-        pose = input_batch[1]
-        if len(pose.shape) == 4:
-            new_pose = np.empty((pose.shape[0], pose.shape[-1], 2), dtype='int32')
-            for i in range(pose.shape[0]):
-                m = resize(pose[i], self._image_size, order=1, preserve_range = True)
-                y, x, _ = np.where(m == m.max(axis = (0, 1)))
-                new_pose[i,:,0] = y
-                new_pose[i,:,1] = x
-            pose = new_pose
-        height, width = batch.shape[1], batch.shape[2]
-        total_width, total_height = width * col, height * row
-        result_image = np.empty((total_height, total_width, batch.shape[3]))
-        batch_index = 0
-        for i in range(row):
-            for j in range(col):
-                image = np.copy(batch[batch_index])
-                if pose is not None:
-                    for joint_index in range(pose.shape[1]):
-                        joint_cord = pose[batch_index][joint_index]
-                        if joint_cord[0] >= height or joint_cord[1] >= width or joint_cord[0] < 0 or joint_cord[1] < 0:
-                            continue
-                        image[joint_cord[0], joint_cord[1]] = (1, 0, 0)
-                            
-                result_image[(i * height):((i+1)*height), (j * width):((j+1)*width)] = image
-                batch_index += 1
-        result_image = img_as_ubyte((result_image + 1) / 2)
-        return result_image
+        pose_batch = input_batch[1]
+        pose_images = np.array([pose_utils.draw_pose_from_map(resize(pose, self._image_size, order=1, preserve_range=True))[0]
+                                      for pose in pose_batch])
+        pose_masks = np.array([pose_utils.draw_pose_from_map(resize(pose, self._image_size, order=1, preserve_range=True))[1]
+                                      for pose in pose_batch])
+        result_images = []
+        for one_res_batch in output_batch:
+            resized_batch = np.array([resize(img, self._image_size, preserve_range=True) for img in one_res_batch])
+            result_images.append(super(PoseHMDataset, self).display(resized_batch))
+        
+        pose_result_image = super(FolderDataset, self).display(pose_images)
+        pose_masks = np.expand_dims(pose_masks, axis=3)
+        pose_result_mask = super(FolderDataset, self).display(pose_masks)
+        result_with_pose = result_images[0].copy()
+        pose_result_mask = np.squeeze(pose_result_mask)
+        result_with_pose[pose_result_mask] = pose_result_image[pose_result_mask]
+        
+        return np.concatenate(np.array([result_with_pose] + result_images), axis=1)
     
     
 # import pandas as pd
