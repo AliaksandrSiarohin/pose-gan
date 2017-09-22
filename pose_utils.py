@@ -104,7 +104,7 @@ def draw_pose_from_cords(pose_joints, img_size, radius=2, draw_joints=True):
 
 def draw_pose_from_map(pose_map, threshold=0.1, **kwargs):
     cords = map_to_cord(pose_map, threshold=threshold)
-    return draw_pose_from_cords(cords, **kwargs)
+    return draw_pose_from_cords(cords, pose_map.shape[:2], **kwargs)
 
 
 def load_pose_cords_from_strings(y_str, x_str):

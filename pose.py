@@ -19,10 +19,10 @@ def main():
     if args.generator_checkpoint is  None:
         generator = make_generator(Input((64,)), Input((16, 8, 18)))
     else:
-        geneartor = args.generator_checkpoint
+        generator = args.generator_checkpoint
     
     if args.discriminator_checkpoint is None:
-        discriminator = make_discriminator(Input((128, 64, 3)))
+        discriminator = make_discriminator(Input((128, 64, 3)), Input((64, 32, 3)), Input((32, 16, 3)))
     else:
         discriminator = args.discriminator_checkpoint
     
