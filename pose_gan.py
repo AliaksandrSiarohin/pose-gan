@@ -22,8 +22,8 @@ class POSE_GAN(WGAN_GP):
     def _compile_generator_loss(self):
         pose_losses = []
         pose_loss_fn = lambda y_true, y_pred, pose_loss: pose_loss
-        for i, resolution in enumerate(2 ** np.arange(len(self._generator_output))):
-            input_to_estimator = ktf.image.resize_images(self._generator_output[i], self._image_size)
+        for i in range(len(self._discriminator_fake_input)):
+            input_to_estimator = ktf.image.resize_images(self._discriminator_fake_input[i], self._image_size)
             estimated_pose = self._pose_estimator (input_to_estimator[..., ::-1] / 2) [1]
             #new_size = (self._image_size[0] / (8 * resolution), self._image_size[1] / (8 * resolution))
             #print (new_size)
@@ -40,9 +40,4 @@ class POSE_GAN(WGAN_GP):
         def generator_loss_fn(y_true, y_pred):
             return wasenstein_loss_fn(y_true, y_pred) + pose_loss_fn(y_true, y_pred)
 
-        return generator_loss_fn, pose_losses + [wasenstein_loss_fn]
-    
-    def _compile_discriminator_fake_input(self):
-        self._generator_output = self._generator(self._generator_input)
-        self._discriminator_fake_input = self._generator_output
-        
+        return generator_loss_fn, pose_losses + [wasenstein_loss_fn]  

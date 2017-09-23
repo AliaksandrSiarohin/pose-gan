@@ -46,7 +46,7 @@ class PoseHMDataset(FolderDataset):
                               for img in images_batch_128_64])
         return [images_batch_128_64, images_batch_64_32, images_batch_32_16]
         
-    def display(self, output_batch, input_batch, row=8, col=8):
+    def display(self, output_batch, input_batch, row=8, col=1):
         pose_batch = input_batch[1]
         pose_images = np.array([pose_utils.draw_pose_from_map(resize(pose, self._image_size, order=1, preserve_range=True))[0]
                                       for pose in pose_batch])
@@ -55,13 +55,14 @@ class PoseHMDataset(FolderDataset):
         result_images = []
         for one_res_batch in output_batch:
             resized_batch = np.array([resize(img, self._image_size, preserve_range=True) for img in one_res_batch])
-            result_images.append(super(PoseHMDataset, self).display(resized_batch))
+            result_image = super(PoseHMDataset, self).display(resized_batch, row=row, col=col)
+            result_images.append(result_image)
         
-        pose_result_image = super(FolderDataset, self).display(pose_images)
+        pose_result_image = super(FolderDataset, self).display(pose_images, row=row, col=col)
         pose_masks = np.expand_dims(pose_masks, axis=3)
-        pose_result_mask = super(FolderDataset, self).display(pose_masks)
+        pose_result_mask = super(FolderDataset, self).display(pose_masks, row=row, col=col)
         result_with_pose = result_images[0].copy()
-        pose_result_mask = np.squeeze(pose_result_mask)
+        pose_result_mask = np.squeeze(pose_result_mask, axis=2)
         result_with_pose[pose_result_mask] = pose_result_image[pose_result_mask]
         
         return np.concatenate(np.array([result_with_pose] + result_images), axis=1)
