@@ -41,16 +41,16 @@ def make_generator(noise, pose):
     y = resblock(y, (3, 3), 'UP', 256)
     y = resblock(y, (3, 3), 'SAME', 256)
     
-    output_32_16 = output_conv(y)
+    #output_32_16 = output_conv(y)
     
-    y = Concatenate(axis=-1) ([output_32_16, y_pose_32_16, y])
+    y = Concatenate(axis=-1) ([y_pose_32_16, y])
     
     y = resblock(y, (3, 3), 'SAME', 128)
     y = resblock(y, (3, 3), 'UP', 128)
     y = resblock(y, (3, 3), 'SAME', 128)    
     
-    output_64_32 = output_conv(y)
-    y = Concatenate(axis=-1) ([output_64_32, y_pose_64_32, y])
+    #output_64_32 = output_conv(y)
+    y = Concatenate(axis=-1) ([y_pose_64_32, y])
     
     y = resblock(y, (3, 3), 'SAME', 64)
     y = resblock(y, (3, 3), 'UP', 64)
@@ -64,29 +64,29 @@ def make_generator(noise, pose):
     
     output_128_64 = output_conv(y)
     
-    return Model(inputs=[noise, pose], outputs=[output_128_64, output_64_32, output_32_16]) 
+    return Model(inputs=[noise, pose], outputs=[output_128_64]) 
 
 
-def make_discriminator(image_128_64, image_64_32, image_32_16):
+def make_discriminator(image_128_64):
     y_128_64 = Conv2D(16, (3, 3), kernel_initializer='he_uniform',
                       use_bias = True, padding='same') (image_128_64)
     
-    y_64_32 = Conv2D(32, (3, 3), kernel_initializer='he_uniform',
-                      use_bias = True, padding='same') (image_64_32)
+#    y_64_32 = Conv2D(32, (3, 3), kernel_initializer='he_uniform',
+#                      use_bias = True, padding='same') (image_64_32)
     
-    y_32_16 = Conv2D(64, (3, 3), kernel_initializer='he_uniform',
-                      use_bias = True, padding='same') (image_32_16)
+#    y_32_16 = Conv2D(64, (3, 3), kernel_initializer='he_uniform',
+#                      use_bias = True, padding='same') (image_32_16)
     
     y = resblock(y_128_64, (3, 3), 'DOWN', 64, LayerNorm)
     y = resblock(y, (3, 3), 'SAME', 64, LayerNorm)
     y = resblock(y, (3, 3), 'SAME', 64, LayerNorm)
-    y = Concatenate(axis=-1) ([y, y_64_32])
+    #y = Concatenate(axis=-1) ([y, y_64_32])
     
     y = resblock(y, (3, 3), 'SAME', 64, LayerNorm)
     y = resblock(y, (3, 3), 'DOWN', 128, LayerNorm)
     y = resblock(y, (3, 3), 'SAME', 128, LayerNorm)
     
-    y = Concatenate(axis=-1) ([y, y_32_16])
+    #y = Concatenate(axis=-1) ([y, y_32_16])
     
     y = resblock(y, (3, 3), 'SAME', 128, LayerNorm)
     y = resblock(y, (3, 3), 'DOWN', 256, LayerNorm)
@@ -100,4 +100,4 @@ def make_discriminator(image_128_64, image_64_32, image_32_16):
     
     y = Flatten()(y)
     y = Dense(1, use_bias = False)(y)
-    return Model(inputs=[image_128_64, image_64_32, image_32_16], outputs=[y])
+    return Model(inputs=[image_128_64], outputs=[y])

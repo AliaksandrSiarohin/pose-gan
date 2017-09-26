@@ -14,46 +14,56 @@ import pose_utils
 import pandas as pd
 
 class PoseHMDataset(FolderDataset):
-    def __init__(self, image_dir, pose_generator, batch_size, noise_size, image_size):
+    def __init__(self, image_dir, pose_estimator, batch_size, noise_size, image_size,):
         super(PoseHMDataset, self).__init__(image_dir, batch_size, noise_size, image_size)
         self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)
-        self._pose_generator = pose_generator
+        self._pose_estimator = pose_estimator
+        self._image_size_init = (1.2 * self._image_size[0], 1.2 * self._image_size[1])
         
-    def _deprocess_pose_array(self, X):
-        X = X / 2 + 0.5
-        X = X.reshape((X.shape[0], 18, 2))
-        X[...,0] *= self._image_size[0] - 0.1
-        X[...,1] *= self._image_size[1] - 0.1
-        return X
+    def _get_pose_array(self, image_batch):
+        pose_array = pose_estimator.predict(image_batch)
+        pose_array = [resize(pose, self._image_size_init, preserve_range=True) for pose in pose_array]
+        return np.array(pose_array)
     
-    def _load_pose_array(self, joints, for_disc=False):
-        pose_list = [resize(pose_utils.cords_to_map(joint, self._image_size), 
-                        (self._image_size[0] / 8, self._image_size[1] / 8), preserve_range=True) for joint in joints]
-        return np.array(pose_list)
+    def _random_crop(self, img_1, img_2):
+        size=self._image_size
+        y = np.random.randint(img_1.shape[0] - size[0], size=1)[0]
+        x = np.random.randint(img_1.shape[1] - size[1], size=1)[0]
+        return img_1[y:(y+size[0]), x:(x+size[1])], img_2[y:(y+size[0]), x:(x+size[1])]
+        
+    def _load_data_batch(self, index):
+        image_batch = np.array([resize(imread(os.path.join(folder, name)), self._image_size_init, preserve_range = True) 
+                                          for name in self._names[index]])
+        
+        pose_batch = self._get_pose_array(self, image_batch)
+                
+        ab_resized = [self._random_crop(pose, img) for pose, img in zip(pose_batch,image_batch)]
+        a_batch, b_batch = zip(*ab_resized)
+        
+        result = [np.array(a_batch), self._preprocess(np.array(b_batch))]
+        return result
+    
+    def _preprocess(self, image):
+        return (image / 255 - 0.5) * 2
+    
+    def _deprocess(self, image):
+        return ((image/2 + 0.5) * 255).astype(np.uint8)
         
     def next_generator_sample(self):
-        index = np.random.choice(self._image_names.shape[0], size = self._batch_size)
-        joints = self._deprocess_pose_array(self._pose_generator.predict(np.random.normal(size = (self._batch_size,64) ))) 
-        noise = super(PoseHMDataset, self).next_generator_sample()[0]
-        pose_array = self._load_pose_array(joints)
-        return [noise, pose_array]
+        index = np.random.choice(self._image_names.shape[0], size = self._batch_size)        
+        return self._load_data_batch(index)
     
     def _load_discriminator_data(self, index):
-        images_batch_128_64 = super(PoseHMDataset, self)._load_discriminator_data(index)[0]
-        images_batch_64_32 = np.array([resize(img, (img.shape[0] / 2, img.shape[1] / 2), preserve_range=True)  
-                              for img in images_batch_128_64])
-        images_batch_32_16 = np.array([resize(img, (img.shape[0] / 4, img.shape[1] / 4), preserve_range=True)  
-                              for img in images_batch_128_64])
-        return [images_batch_128_64, images_batch_64_32, images_batch_32_16]
+        return self._load_data_batch(index)
         
-    def display(self, output_batch, input_batch, row=8, col=1):
-        pose_batch = input_batch[1]
+    def display(self, output_batch, input_batch, row=8, col=2):
+        pose_batch = input_batch[0]
         pose_images = np.array([pose_utils.draw_pose_from_map(resize(pose, self._image_size, order=1, preserve_range=True))[0]
                                       for pose in pose_batch])
         pose_masks = np.array([pose_utils.draw_pose_from_map(resize(pose, self._image_size, order=1, preserve_range=True))[1]
                                       for pose in pose_batch])
         result_images = []
-        for one_res_batch in output_batch:
+        for one_res_batch in [output_batch[1], input_batch[1]]:
             resized_batch = np.array([resize(img, self._image_size, preserve_range=True) for img in one_res_batch])
             result_image = super(PoseHMDataset, self).display(resized_batch, row=row, col=col)
             result_images.append(result_image)
