@@ -49,7 +49,7 @@ def make_generator(input_a, input_b):
     #input is 8 x 4 x 512
     e5 = block(e4, 512)
     #input is 4 x 2 x 512
-    e6 = block(e5, 512)
+    e6 = block(e5, 512, bn = False)
     #input is 2 x 1 x 512
     out = block(e6, 512, down=False, leaky=False, dropout = True)
     #input is 4 x 2 x 512  
@@ -66,7 +66,7 @@ def make_generator(input_a, input_b):
     out = block(out, 256, down=False, leaky=False)
     #input is 64 x 32 x 256
     out = Concatenate(axis=-1)([out, e1])
-    out = block(out, 3, down=False, leaky=False)
+    out = block(out, 3, down=False, leaky=False, bn=False)
     #input is  128 x 64 x 128
     
     out = Activation('tanh') (out)
@@ -90,7 +90,9 @@ class CGAN(GAN):
     def __init__(self, generator, discriminator, l1_weigh_penalty = 100, **kwargs):
         super(CGAN, self).__init__(generator, discriminator, generator_optimizer = Adam(2e-4, 0.5, 0.999),
                                                  discriminator_optimizer = Adam(2e-4, 0.5, 0.999), **kwargs)
+     
         self._l1_weigh_penalty = l1_weigh_penalty
+        self._generator.summary()
         self.generator_metric_names = ['gan_loss', 'l1_loss']
 
     def _compile_generator_loss(self):
@@ -106,6 +108,7 @@ class CGAN(GAN):
 class ConditionalDataset(UGANDataset):
     def __init__(self, batch_size, input_folder, pose_estimator, img_size_final, img_size_init):
         super(ConditionalDataset, self).__init__(batch_size, None)
+
         self._input_folder = input_folder
         self._pose_estimator = pose_estimator
         self._folder_b = os.path.join(input_folder, 'A')
@@ -132,7 +135,7 @@ class ConditionalDataset(UGANDataset):
         result = [self._preprocess(np.array(a_batch)), self._preprocess(np.array(b_batch))]
         return result
     
-    def _preprocess(self, image):
+    def _preprocess_image(self, image):
         return (image / 255 - 0.5) * 2
     
     def _deprocess(self, image):

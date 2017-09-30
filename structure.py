@@ -54,28 +54,6 @@ def make_generator():
     return Model(inputs=[x], outputs=[y])
 
 
-# class MissingEmbeding(Layer):
-#     def __init__(self, default_val_init='zero', **kwargs):
-#         self.default_val_init = initializers.get(default_val_init)
-#
-#         self.uses_learning_phase = True
-#         super(MissingEmbeding, self).__init__(**kwargs)
-#
-#     def build(self, input_shape):
-#         self.default_val = K.variable(self.default_val_init(input_shape[1:]), name='{}_default_val'.format(self.name))
-#
-#         self.trainable_weights = [self.default_val]
-#
-#     def call(self, x, mask=None):
-#         def trav_joints(inp):
-#             inp, emb = inp
-#             pred = ktf.logical_or(inp[0] < -1, inp[1] < -1)
-#             return ktf.cond(pred, lambda: emb, lambda:inp)
-#         fn = lambda joints: ktf.map_fn(trav_joints, (joints, self.default_val), dtype='float32', back_prop=False)
-#         out = ktf.map_fn(fn, x, back_prop=False)
-#         return out
-
-
 def make_discriminator():
     """Creates a discriminator model that takes an image as input and outputs a single value, representing whether
     the input is real or generated."""
