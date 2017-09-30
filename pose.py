@@ -14,7 +14,7 @@ from skimage.io import imsave
 def main():
     parser = parser_with_default_args()
     parser.add_argument("--pose_model", default="cao-hpe/pose_estimator.h5", help="Pose estimator")
-    parser.add_argument("--pose_generator", default="structure_generator.h5", help="Generator of structure")
+    parser.add_argument("--pose_generator", default="st_gen.h5", help="Generator of structure")
     parser.add_argument("--pose_penalty_weight", default=1000, type=int, help="Weight of pose penalty")
     
     args = parser.parse_args()
@@ -32,7 +32,8 @@ def main():
     
     dataset = PoseHMDataset(args.input_folder, pose_estimator, args.batch_size, (64,), (128, 64))
     
-    poses = pose_generator.predict(np.random.normal(size = (args.batch_size, 64)))
+    poses, mask = pose_generator.predict([np.random.normal(size = (args.batch_size, 64)),
+                                          np.random.normal(size = (args.batch_size, 64))])
     def deprocess_array(X):
         X = X / 2 + 0.5
         X = X.reshape((X.shape[0], 18, 2))
@@ -40,17 +41,18 @@ def main():
         X[...,1] *= 64 - 0.1
         return X
     poses = deprocess_array(poses)
-    poses *= 1.2
+    poses[mask.reshape((-1, 18, 2)) < 0.5] = -1
+    #poses *= 1.2
     poses = poses.astype(np.int)
     import keras.backend as K
     import tensorflow as ktf
     K._LEARNING_PHASE = ktf.constant(1)
     batch = dataset.next_generator_sample()
-    batch[0] = np.array([pose_utils.cords_to_map(pose, (int(128 * 1.2), int(64 * 1.2))) for pose in poses])
-    batch[0] = np.array([dataset._random_crop(b, b)[0] for b in batch[0]])
+    batch[0] = np.array([pose_utils.cords_to_map(pose, (int(128), int(64))) for pose in poses])
+    #batch[0] = np.array([dataset._random_crop(b, b)[0] for b in batch[0]])
     
     img = dataset.display(generator.predict(batch), batch)
-    imsave('cgan_res.png', img[:, :(img.shape[1]/2)])
+    imsave('cgan_res_no_mask.png', img[:, :(img.shape[1]/2)])
     
 #    gan = CGAN(generator, discriminator, 100, 
 #                  custom_objects = {'LayerNorm':LayerNorm}, **vars(args))

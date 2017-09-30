@@ -1,5 +1,5 @@
 from keras.models import Model, Sequential
-from keras.layers import Dense, Reshape, Flatten, Activation, Input
+from keras.layers import Dense, Reshape, Flatten, Activation, Input, Multiply, Concatenate, RepeatVector, Permute
 from keras.layers.convolutional import Conv2D
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
@@ -45,24 +45,28 @@ def make_generator():
 
     y = Dense(64, use_bias=False)(y)
     y = BatchNormalization()(y)
-    y = LeakyReLU()(y)
-
-    y = Dense(18 * 2, use_bias=False)(y)
-    #y = Reshape((18, 2))(y)
+    y = LeakyReLU()(y)    
+    
+    y = Dense(18 * 2, use_bias=True)(y)
     y = Activation('tanh')(y)
-
-    return Model(inputs=[x], outputs=[y])
+    
+   
+    mask = Dense(18 * 2, use_bias=True)(y)
+    mask = Activation('sigmoid')(mask)    
+ 
+    return Model(inputs=[x], outputs=[y, mask])
 
 
 def make_discriminator():
     """Creates a discriminator model that takes an image as input and outputs a single value, representing whether
     the input is real or generated."""
-    x = Input((2 * 18, ))
-    #y = MissingEmbeding()(x)
+    x = Input((18 * 2,))
+    mask = Input((18 * 2,))
+    
+    y = Multiply()([x, mask])
+    y = Concatenate(axis=-1) ([y, mask])
 
-    #y = Flatten()(x)
-
-    y = Dense(64, use_bias=True)(x)
+    y = Dense(64, use_bias=True)(y)
     y = LeakyReLU()(y)
 
     y = Dense(128, use_bias=True)(y)
@@ -79,9 +83,18 @@ def make_discriminator():
 
     y = Dense(32, use_bias=True)(y)
     y = LeakyReLU()(y)
-
+    
+#     y_mask = Dense(64, use_bias=True)(mask)
+#     y_mask = LeakyReLU()(y_mask)
+#     y_mask = Dense(32, use_bias=True)(y_mask)
+#     y_mask = LeakyReLU()(y_mask)
+#     y_mask = Dense(16, use_bias=True)(y_mask)
+#     y_mask = LeakyReLU()(y_mask)
+    
+#     y = Concatenate(axis=-1)([y, y_mask])
+    
     y = Dense(1, use_bias=True)(y)
-    return Model(inputs=[x], outputs=[y])
+    return Model(inputs=[x, mask], outputs=[y])
 
 
 class StuctureDataset(ArrayDataset):
@@ -91,10 +104,27 @@ class StuctureDataset(ArrayDataset):
         X = []
         for index, row in df.iterrows():
             X.append(pose_utils.load_pose_cords_from_strings(row['keypoints_y'], row['keypoints_x']))
-        X = pose_utils.mean_inputation(np.array(X, dtype='float32'))
+        X = np.array(X, dtype='float32')
+        self._mask = self._get_mask(X)
         X = self._preprocess_array(X)
+        self._seed = 0
         super(StuctureDataset, self).__init__(X, batch_size, noise_size)
-
+    
+    def _get_mask(self, X):
+        return (X != -1).astype('float32')
+    
+    def _load_discriminator_data(self, index):
+        mask = self._mask[index]
+        mask = mask.reshape((mask.shape[0], -1))
+        return [self._X[index], mask]
+    
+    def _shuffle_discriminator_data(self):
+        self._seed += 1
+        np.random.seed(self._seed)
+        np.random.shuffle(self._X)
+        np.random.seed(self._seed)
+        np.random.shuffle(self._mask)
+    
     def _preprocess_array(self, X):
         X[:,:,0] /= self._img_size[0]
         X[:,:,1] /= self._img_size[1]
@@ -104,20 +134,29 @@ class StuctureDataset(ArrayDataset):
     def _deprocess_array(self, X):
         X = X / 2 + 0.5
         X = X.reshape((X.shape[0], 18, 2))
+        mask = X < 0
         X[...,0] *= self._img_size[0] - 0.1
         X[...,1] *= self._img_size[1] - 0.1
-        return X.astype(np.uint8)
+        X[mask] = -1
+        return X.astype(np.int)
 
-    def display(self, output_batch, input_batch = None, row=8, col=8):
-        output_batch = self._deprocess_array(output_batch)
+    def display(self, output_batch, input_batch = None, row=64, col=1):
+        pose, mask = output_batch[0], output_batch[1]
+        
+        output_batch = self._deprocess_array(pose)
+        output_batch[mask.reshape((-1, 18, 2)) < 0.5] = -1        
         imgs = np.array([pose_utils.draw_pose_from_cords(cord, self._img_size)[0] for cord in output_batch])
-        generatred = super(StuctureDataset, self).display(imgs, None, row, col)
+        generatred_masked = super(StuctureDataset, self).display(imgs, None, row, col)
+        
+        output_batch = self._deprocess_array(pose)       
+        imgs = np.array([pose_utils.draw_pose_from_cords(cord, self._img_size)[0] for cord in output_batch])
+        generated_not_masked = super(StuctureDataset, self).display(imgs, None, row, col)
 
         output_batch = self._deprocess_array(self._X[:64])
         imgs = np.array([pose_utils.draw_pose_from_cords(cord, self._img_size)[0] for cord in output_batch])
         true = super(StuctureDataset, self).display(imgs, None, row, col)
 
-        return np.concatenate([generatred, true], axis = 1)
+        return np.concatenate([generated_not_masked, generatred_masked, true], axis = 1)
 
 
 def main():
