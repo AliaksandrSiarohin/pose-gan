@@ -14,6 +14,7 @@ import numpy as np
 from skimage.transform import resize
 from skimage.io import imread, imsave
 import os
+from keras.backend import tf as ktf
 
 from keras.optimizers import Adam
 
@@ -87,23 +88,34 @@ def make_discriminator(input_a, input_b):
 
 
 class CGAN(GAN):
-    def __init__(self, generator, discriminator, l1_weigh_penalty = 100, **kwargs):
+    def __init__(self, generator, discriminator, pose_estimator, l1_weigh_penalty = 100, pose_penalty_weight=1000, **kwargs):
         super(CGAN, self).__init__(generator, discriminator, generator_optimizer = Adam(2e-4, 0.5, 0.999),
                                                  discriminator_optimizer = Adam(2e-4, 0.5, 0.999), **kwargs)
      
         self._l1_weigh_penalty = l1_weigh_penalty
         self._generator.summary()
-        self.generator_metric_names = ['gan_loss', 'l1_loss']
+        self.generator_metric_names = ['gan_loss', 'l1_loss', 'pose_loss']
+        self._pose_penalty_weight = pose_penalty_weight
+        self._pose_estimator = pose_estimator
 
     def _compile_generator_loss(self):
         gan_loss_fn = super(CGAN, self)._compile_generator_loss()[0]
         l1_loss = self._l1_weigh_penalty * K.mean(K.abs(self._generator_input[1] - self._discriminator_fake_input[1]))
+
+#         estimated_pose = self._pose_estimator (self._discriminator_fake_input[1][..., ::-1] / 2) [1][..., :18]
+#         reference_pose = self._generator_input[0]
+#         estimated_pose = ktf.image.resize_images(estimated_pose, (128, 64))   
+#         pose_loss = self._pose_penalty_weight * K.mean((estimated_pose -  reference_pose) ** 2)
+        
+#         def pose_loss_fn(y_true, y_pred):
+#             return pose_loss
+        
         def l1_loss_fn(y_true, y_pred):
             return l1_loss
         
         def generator_loss(y_true, y_pred):
-            return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred)
-        return generator_loss, [gan_loss_fn, l1_loss_fn]
+            return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred)# + pose_loss_fn(y_true, y_pred)
+        return generator_loss, [gan_loss_fn, l1_loss_fn]#, pose_loss_fn]
 
 class ConditionalDataset(UGANDataset):
     def __init__(self, batch_size, input_folder, pose_estimator, img_size_final, img_size_init):

@@ -17,15 +17,19 @@ from skimage.io import imread
 from tqdm import tqdm
 
 class PoseHMDataset(FolderDataset):
-    def __init__(self, image_dir, pose_estimator, batch_size, noise_size, image_size, precompute=False):
-        super(PoseHMDataset, self).__init__(image_dir, batch_size, noise_size, image_size)
+    def __init__(self, image_dir, pose_estimator, batch_size, noise_size, image_size, precompute=True):
+        super(PoseHMDataset, self).__init__(image_dir, batch_size, noise_size, image_size)        
         self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)
         self._pose_estimator = pose_estimator
-        self._image_size_init = (int(1.2 * self._image_size[0]), int(1.2 * self._image_size[1]))
-        self._pose_dir = 'tmp_pose'
+        self._image_size_init = (int(1.05 * self._image_size[0]), int(1.05 * self._image_size[1]))
+        self._pose_dir = 'tmp_pose-fasion'
         self._precompute = precompute
-        if precompute:
-            self.precompute_pose_maps()
+        # if precompute:
+        #     self.precompute_pose_maps()
+        names = [name.replace('.npy', '') for name in os.listdir(self._pose_dir)]
+        self._image_names = np.array(names)
+        print (self._image_names.shape)
+        self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)  
         
     def precompute_pose_maps(self):
         print ("Precomputing pose_maps...")
@@ -36,16 +40,17 @@ class PoseHMDataset(FolderDataset):
             img = self._preprocess_image(np.expand_dims(img, axis=0)) / 2
             
             pose_array = self._pose_estimator.predict(img)[1][..., :18]
-            pose_array = (resize(pose, self._image_size_init, preserve_range=True) for pose in pose_array)
-            pose_array = (pose_utils.map_to_cord(pose) for pose in pose_array)
-            pose_array = np.array([pose_utils.cords_to_map(pose, self._image_size_init) for pose in pose_array])            
-            pose_array = np.squeeze(pose_array, axis=0)
-            
-            np.save(os.path.join(self._pose_dir, name), pose_array)
+            pose_array = np.array([resize(pose, self._image_size_init, preserve_range=True) for pose in pose_array])
+            pose_array = [pose_utils.map_to_cord(pose) for pose in pose_array]
+            if len(np.where(pose_array[0] != -1)[0]) > 10:                
+                pose_array = np.array([pose_utils.cords_to_map(pose, self._image_size_init) for pose in pose_array])        
+                pose_array = np.squeeze(pose_array, axis=0)
+
+                np.save(os.path.join(self._pose_dir, name), pose_array)
 
     def _get_pose_array(self, image_batch):
         pose_array = self._pose_estimator.predict(image_batch)[1][..., :18]
-        pose_array = (resize(pose, self._image_size_init, preserve_range=True) for pose in pose_array)
+        pose_array = [resize(pose, self._image_size_init, preserve_range=True) for pose in pose_array]
         pose_array = (pose_utils.map_to_cord(pose) for pose in pose_array)
         pose_array = [pose_utils.cords_to_map(pose, self._image_size_init) for pose in pose_array]
         return np.array(pose_array)
@@ -82,7 +87,7 @@ class PoseHMDataset(FolderDataset):
     def _load_discriminator_data(self, index):
         return self._load_data_batch(index)
         
-    def display(self, output_batch, input_batch, row=8, col=8):
+    def display(self, output_batch, input_batch, row=4, col=1):
         pose_batch = input_batch[0]
         pose_images = np.array([pose_utils.draw_pose_from_map(resize(pose, self._image_size, order=1, preserve_range=True))[0]
                                       for pose in pose_batch])

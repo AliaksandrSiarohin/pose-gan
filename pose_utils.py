@@ -26,33 +26,37 @@ MISSING_VALUE = -1
 
 
 def map_to_cord(pose_map, threshold = 0.1):
-    all_peaks = []
+    all_peaks = [[] for i in range(18)]
     peak_counter = 0
+       
+    y, x, z = np.where(np.logical_and(pose_map == pose_map.max(axis = (0, 1)),
+                                     pose_map > threshold))
+    for x_i, y_i, z_i in zip(x, y, z):
+        all_peaks[z_i].append([x_i, y_i])
 
-    for part in range(18):
-        map_ori = pose_map[:, :, part]
-        map = gaussian_filter(map_ori, sigma=3)
+    
+    # for part in range(18):
 
-        map_left = np.zeros(map.shape)
-        map_left[1:, :] = map[:-1, :]
-        map_right = np.zeros(map.shape)
-        map_right[:-1, :] = map[1:, :]
-        map_up = np.zeros(map.shape)
-        map_up[:, 1:] = map[:, :-1]
-        map_down = np.zeros(map.shape)
-        map_down[:, :-1] = map[:, 1:]
+#         map_left = np.zeros(map.shape)
+#         map_left[1:, :] = map[:-1, :]
+#         map_right = np.zeros(map.shape)
+#         map_right[:-1, :] = map[1:, :]
+#         map_up = np.zeros(map.shape)
+#         map_up[:, 1:] = map[:, :-1]
+#         map_down = np.zeros(map.shape)
+#         map_down[:, :-1] = map[:, 1:]
 
-        peaks_binary = np.logical_and.reduce(
-            (map >= map_left, map >= map_right, map >= map_up, map >= map_down, map > threshold))
+#         peaks_binary = np.logical_and.reduce(
+#             (map >= map_left, map >= map_right, map >= map_up, map >= map_down, map > threshold))
 
-        peaks = zip(np.nonzero(peaks_binary)[1], np.nonzero(peaks_binary)[0])
+#         peaks = zip(np.nonzero(peaks_binary)[1], np.nonzero(peaks_binary)[0])
 
-        peaks_with_score = [x + (map_ori[x[1], x[0]],) for x in peaks]
-        id = range(peak_counter, peak_counter + len(peaks))
-        peaks_with_score_and_id = [peaks_with_score[i] + (id[i],) for i in range(len(id))]
+#         peaks_with_score = [x + (map_ori[x[1], x[0]],) for x in peaks]
+#         id = range(peak_counter, peak_counter + len(peaks))
+#         peaks_with_score_and_id = [peaks_with_score[i] + (id[i],) for i in range(len(id))]
 
-        all_peaks.append(peaks_with_score_and_id)
-        peak_counter += len(peaks)
+#         all_peaks.append(peaks_with_score_and_id)
+#        peak_counter += len(peaks)
 
     x_values = []
     y_values = []
@@ -132,7 +136,7 @@ if __name__ == "__main__":
     i = 5
     df = pd.read_csv('cao-hpe/annotations.csv', sep=':')
     output_folder = 'train-annotated'
-    input_folder = 'market-dataset/bounding_box_train'
+    input_folder = '../market-dataset/bounding_box_train'
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -146,25 +150,25 @@ if __name__ == "__main__":
 
         map = cords_to_map(pose_cords, (128, 64))
 
-        colors, mask = draw_pose_from_cords(pose_cords, img.shape[:2])
+        colors, mask = draw_pose_from_map(map)
 
-        img[mask] = colors[mask]
+#         img[mask] = colors[mask]
 
-        a_not_resized=np.load(row['name'] + '.npy')
-        #a_resized = resize(a_not_resized, output_shape=(128, 64), preserve_range=True)
-        print (pose_cords[1])
-        print (map[..., 1].mean())
+#         a_not_resized=np.load(row['name'] + '.npy')
+#         #a_resized = resize(a_not_resized, output_shape=(128, 64), preserve_range=True)
+#         print (pose_cords[1])
+#         print (map[..., 1].mean())
 
-        from scipy.optimize import minimize_scalar
-        fn = lambda sigma: np.sum((cords_to_map(pose_cords, (128, 64), sigma) - a_not_resized[..., :18]) ** 2)
-        a = minimize_scalar(fn, bounds=(0, 21))
-        print (a)
+#         from scipy.optimize import minimize_scalar
+#         fn = lambda sigma: np.sum((cords_to_map(pose_cords, (128, 64), sigma) - a_not_resized[..., :18]) ** 2)
+#         a = minimize_scalar(fn, bounds=(0, 21))
+#         print (a)
 
         #print (map.max(axis=2))
-        plt.imshow(map[..., 1], cmap=plt.cm.gray_r)
+        plt.imshow(colors, cmap=plt.cm.gray_r)
         draw_legend()
         plt.savefig(os.path.join(output_folder, row['name'] +'_joints.png'))
 
-        plt.imshow(a_not_resized[..., 1], cmap=plt.cm.gray_r)
-        draw_legend()
-        plt.savefig(os.path.join(output_folder, row['name'] +'_img_joints.png'))
+        # plt.imshow(a_not_resized[..., 1], cmap=plt.cm.gray_r)
+        # draw_legend()
+        # plt.savefig(os.path.join(output_folder, row['name'] +'_img_joints.png'))
