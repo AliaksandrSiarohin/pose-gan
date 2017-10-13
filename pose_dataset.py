@@ -15,6 +15,8 @@ import pandas as pd
 
 from skimage.io import imread
 from tqdm import tqdm
+from skimage.color import gray2rgb
+
 
 class PoseHMDataset(FolderDataset):
     def __init__(self, image_dir, pose_estimator, batch_size, noise_size, image_size, precompute=True):
@@ -22,31 +24,7 @@ class PoseHMDataset(FolderDataset):
         self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)
         self._pose_estimator = pose_estimator
         self._image_size_init = (int(1.05 * self._image_size[0]), int(1.05 * self._image_size[1]))
-        self._pose_dir = 'tmp_pose-fasion'
-        self._precompute = precompute
-        # if precompute:
-        #     self.precompute_pose_maps()
-        names = [name.replace('.npy', '') for name in os.listdir(self._pose_dir)]
-        self._image_names = np.array(names)
-        print (self._image_names.shape)
-        self._batches_before_shuffle = int(self._image_names.shape[0] // self._batch_size)  
-        
-    def precompute_pose_maps(self):
-        print ("Precomputing pose_maps...")
-        if not os.path.exists(self._pose_dir):
-            os.makedirs(self._pose_dir)
-        for name in tqdm(self._image_names):
-            img = resize(imread(os.path.join(self._input_dir, name)), self._image_size_init, preserve_range = True)
-            img = self._preprocess_image(np.expand_dims(img, axis=0)) / 2
-            
-            pose_array = self._pose_estimator.predict(img)[1][..., :18]
-            pose_array = np.array([resize(pose, self._image_size_init, preserve_range=True) for pose in pose_array])
-            pose_array = [pose_utils.map_to_cord(pose) for pose in pose_array]
-            if len(np.where(pose_array[0] != -1)[0]) > 10:                
-                pose_array = np.array([pose_utils.cords_to_map(pose, self._image_size_init) for pose in pose_array])        
-                pose_array = np.squeeze(pose_array, axis=0)
-
-                np.save(os.path.join(self._pose_dir, name), pose_array)
+        self._pose_dir = '../edge_boxes_with_python/market-bbox-mask-5/'
 
     def _get_pose_array(self, image_batch):
         pose_array = self._pose_estimator.predict(image_batch)[1][..., :18]
@@ -66,10 +44,9 @@ class PoseHMDataset(FolderDataset):
                                           for name in self._image_names[index]])
         
         image_batch = self._preprocess_image(image_batch)
-        if self._precompute:
-            pose_batch = np.array([np.load(os.path.join(self._pose_dir, name + '.npy')) for name in self._image_names[index]])
-        else:
-            pose_batch = self._get_pose_array(image_batch / 2)
+        pose_batch = np.array([resize(np.load(os.path.join(self._pose_dir, name + '.npy')), 
+                               self._image_size_init, preserve_range = True)[:, :, np.newaxis]
+                               for name in self._image_names[index]])
                 
         ab_resized = [self._random_crop(pose, img) for pose, img in zip(pose_batch,image_batch)]
         a_batch, b_batch = zip(*ab_resized)
@@ -88,27 +65,13 @@ class PoseHMDataset(FolderDataset):
         return self._load_data_batch(index)
         
     def display(self, output_batch, input_batch, row=4, col=1):
-        pose_batch = input_batch[0]
-        pose_images = np.array([pose_utils.draw_pose_from_map(resize(pose, self._image_size, order=1, preserve_range=True))[0]
-                                      for pose in pose_batch])
-        pose_masks = np.array([pose_utils.draw_pose_from_map(resize(pose, self._image_size, order=1, preserve_range=True))[1]
-                                      for pose in pose_batch])
-        result_images = []
-        for one_res_batch in [output_batch[1], input_batch[1]]:
-            resized_batch = np.array([resize(img, self._image_size, preserve_range=True) for img in one_res_batch])
-            result_image = super(PoseHMDataset, self).display(resized_batch, row=row, col=col)
-            result_images.append(result_image)
+        in_mask = super(FolderDataset, self).display(input_batch[0], row=row, col=col)
+        in_mask = np.squeeze(in_mask / np.max(in_mask))
+        in_mask = img_as_ubyte(gray2rgb(in_mask))
         
-        pose_result_image = super(FolderDataset, self).display(pose_images, row=row, col=col)
-        pose_masks = np.expand_dims(pose_masks, axis=3)
-        pose_result_mask = super(FolderDataset, self).display(pose_masks, row=row, col=col)
-        
-        true_with_pose = result_images[1].copy()
-        result_with_pose = result_images[0].copy()
-        pose_result_mask = np.squeeze(pose_result_mask, axis=2)
-        result_with_pose[pose_result_mask] = pose_result_image[pose_result_mask]
-        true_with_pose[pose_result_mask] = pose_result_image[pose_result_mask]
-        return np.concatenate(np.array([result_with_pose] + result_images + [true_with_pose]), axis=1)
+        out_img = super(PoseHMDataset, self).display(output_batch[1], row=row, col=col)
+        ref_img = super(PoseHMDataset, self).display(input_batch[1], row=row, col=col)
+        return np.concatenate(np.array([in_mask, out_img, ref_img]), axis=1)
     
     
 

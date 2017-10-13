@@ -19,11 +19,11 @@ def main():
     
     args = parser.parse_args()
             
-    generator = make_generator(Input((128, 64, 18)), Input((128, 64, 3)))
+    generator = make_generator(Input((128, 64, 1)), Input((128, 64, 3)))
     if args.generator_checkpoint is not  None:
         generator.load_weights(args.generator_checkpoint)
     
-    discriminator = make_discriminator(Input((128, 64, 18)), Input((128, 64, 3)))
+    discriminator = make_discriminator(Input((128, 64, 1)), Input((128, 64, 3)))
     if args.discriminator_checkpoint is not None:
         discriminator.load_weights(args.discriminator_checkpoint)
     
