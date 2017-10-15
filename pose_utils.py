@@ -8,7 +8,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from skimage.transform import resize
-
+from math import sqrt
 
 LIMB_SEQ = [[1,2], [1,5], [2,3], [3,4], [5,6], [6,7], [1,8], [8,9],
            [9,10], [1,11], [11,12], [12,13], [1,0], [0,14], [14,16],
@@ -23,6 +23,27 @@ LABELS = ['nose', 'neck', 'Rsho', 'Relb', 'Rwri', 'Lsho', 'Lelb', 'Lwri',
                'Rhip', 'Rkne', 'Rank', 'Lhip', 'Lkne', 'Lank', 'Leye', 'Reye', 'Lear', 'Rear']
 
 MISSING_VALUE = -1
+
+def bbox_plot_predictions(image, bboxes):
+	import pylab as plt
+	plt.imshow(image)
+	current_axis = plt.gca()
+	for bbox in bboxes:
+		coords = (bbox[1], bbox[0]), bbox[3]-bbox[1]+1, bbox[2]-bbox[0]+1
+		current_axis.add_patch(plt.Rectangle(*coords, fill=False, edgecolor='red', linewidth=2))
+        
+def bbox_to_map(bboxes, img_size):
+    result = np.zeros(img_size, dtype='float32')
+    for bbox in bboxes:
+        xx, yy = np.meshgrid(np.arange(img_size[1]), np.arange(img_size[0]))
+        center_y = (bbox[2] - bbox[0]) / 2.0 + bbox[0]
+        center_x = (bbox[3] - bbox[1]) / 2.0 + bbox[1]
+        sigma_y = (bbox[2] - bbox[0]) / 2.0
+        sigma_x = (bbox[3] - bbox[1]) / 2.0
+        norm_const = (sigma_x * sigma_y * sqrt(2 * np.pi)) ** (-1)
+        result = np.maximum(result, norm_const * np.exp(-((yy - center_y) ** 2) / (2 * sigma_y ** 2) -
+                                                    ((xx - center_x) ** 2) / (2 * sigma_x ** 2)))
+    return result
 
 
 def map_to_cord(pose_map, threshold = 0.1):
