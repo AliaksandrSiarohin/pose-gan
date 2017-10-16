@@ -65,8 +65,9 @@ class PoseHMDataset(FolderDataset):
         return self._load_data_batch(index)
         
     def display(self, output_batch, input_batch, row=4, col=1):
-        in_mask = super(FolderDataset, self).display(input_batch[0], row=row, col=col)
-        in_mask = np.squeeze(in_mask / np.max(in_mask))
+        in_mask = np.array([a / np.max(a) for a in input_batch[0]])
+        in_mask = super(FolderDataset, self).display(in_mask, row=row, col=col)
+        in_mask = np.squeeze(in_mask)
         in_mask = img_as_ubyte(gray2rgb(in_mask))
         
         out_img = super(PoseHMDataset, self).display(output_batch[1], row=row, col=col)

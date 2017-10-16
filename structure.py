@@ -22,6 +22,8 @@ import keras.backend as K
 import os
 from tqdm import tqdm
 
+NUMBER_OF_BBOXES = 10
+
 def make_generator():
     """Creates a generator model that takes a 128-dimensional noise vector as a "seed", and outputs images
     of size 128x64x3."""
@@ -38,7 +40,7 @@ def make_generator():
     y = BatchNormalization()(y)
     y = LeakyReLU()(y)    
     
-    y = Dense(5 * 4, use_bias=True)(y)
+    y = Dense(NUMBER_OF_BBOXES * 4, use_bias=True)(y)
     y = Activation('tanh')(y)
 
     return Model(inputs=[x], outputs=[y])
@@ -47,7 +49,7 @@ def make_generator():
 def make_discriminator():
     """Creates a discriminator model that takes an image as input and outputs a single value, representing whether
     the input is real or generated."""
-    x = Input((5 * 4,))
+    x = Input((NUMBER_OF_BBOXES * 4,))
 
     y = Dense(64, use_bias=True)(x)
     y = LeakyReLU()(y)
@@ -68,7 +70,7 @@ class StuctureDataset(ArrayDataset):
         X = []
         for name in tqdm(os.listdir('../market-dataset/bounding_box_train/')):
             ano = np.load('../edge_boxes_with_python/market-bbox-propose/' + name + '.npy')
-            X.append(ano[0:5, 0:4])
+            X.append(ano[0:NUMBER_OF_BBOXES, 0:4])
         X = self._preprocess_array(np.array(X))
         super(StuctureDataset, self).__init__(X, batch_size, noise_size)
     
@@ -80,7 +82,7 @@ class StuctureDataset(ArrayDataset):
 
     def _deprocess_array(self, X):
         X = X / 2 + 0.5
-        X = X.reshape((X.shape[0], 5, 4))
+        X = X.reshape((X.shape[0], NUMBER_OF_BBOXES, 4))
         mask = X < 0
         X[...,0::2] *= self._img_size[0] - 0.1
         X[...,1::2] *= self._img_size[1] - 0.1
