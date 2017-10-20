@@ -1,6 +1,5 @@
 import pose_utils
 import os
-import sys
 import numpy as np
 
 from keras.models import load_model
@@ -59,7 +58,6 @@ for dataset in ['train', 'test']:
 
         heatmap_avg /= len(multiplier)
 
-        np.save(image_name, heatmap_avg)
         pose_cords = pose_utils.map_to_cord(heatmap_avg, threshold=threshold)
 
         print >> result_file, "%s: %s: %s" % (image_name, str(list(pose_cords[:, 0])), str(list(pose_cords[:, 1])))
