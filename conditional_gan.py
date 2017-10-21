@@ -1,4 +1,4 @@
-from keras.models import Model
+from keras.models import Model, Input
 from keras.layers import Flatten, Concatenate, Activation, Dropout
 from keras.layers.convolutional import Conv2D, Conv2DTranspose, ZeroPadding2D, Cropping2D
 from keras_contrib.layers.normalization import InstanceNormalization
@@ -36,7 +36,7 @@ class WarpLayer(Layer):
         return ktf.scatter_nd(index, inputs[0], self.sc_shape)
 
     def compute_output_shape(self, input_shape):
-        return input_shape[1]
+        return input_shape[0]
 
     def get_config(self):
         config = {"batch_size": self.batch_size}
@@ -62,9 +62,20 @@ def block(out, nkernels, down=True, bn=True, dropout=False, leaky=True):
     return out
     
     
-def make_generator(input_a, input_b):
+def make_generator(image_size, use_input_pose, use_warp_skip, batch_size):
     # input is 128 x 64 x nc
-    e1 = ZeroPadding2D((1, 1)) (input_a)
+    input_img = Input(list(image_size) + [3])
+    output_pose = Input(list(image_size) + [18])
+    input_pose = Input(list(image_size) + [18])
+    output_img = Input(list(image_size) + [3])
+    warp = Input(list(image_size) + [2])
+
+    inputs = [input_img, output_pose]
+    if use_input_pose:
+        inputs.append(input_pose)
+    inp = Concatenate(axis=-1)(inputs)
+
+    e1 = ZeroPadding2D((1, 1)) (inp)
     e1 = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(e1)
     #input is 64 x 32 x 64
     e2 = block(e1, 128)
@@ -77,6 +88,12 @@ def make_generator(input_a, input_b):
     #input is 4 x 2 x 512
     e6 = block(e5, 512, bn = False)
     #input is 2 x 1 x 512
+    if use_warp_skip:
+        e1 = WarpLayer(batch_size)([e1, warp])
+        e2 = WarpLayer(batch_size)([e2, warp])
+        e3 = WarpLayer(batch_size)([e3, warp])
+        e4 = WarpLayer(batch_size)([e4, warp])
+
     out = block(e6, 512, down=False, leaky=False, dropout = True)
     #input is 4 x 2 x 512  
     out = Concatenate(axis=-1)([out, e5])
@@ -95,13 +112,23 @@ def make_generator(input_a, input_b):
     out = block(out, 3, down=False, leaky=False, bn=False)
     #input is  128 x 64 x 128
     
-    out = Activation('tanh') (out)
-    
-    return Model(inputs=[input_a, input_b], outputs=[input_a, out])
+    out = Activation('tanh')(out)
+
+    return Model(inputs=inputs + ([output_img, warp] if use_warp_skip else [output_img]), outputs=inputs + [out])
 
 
-def make_discriminator(input_a, input_b):
-    out = Concatenate(axis=-1)([input_a, input_b])
+def make_discriminator(image_size, use_input_pose):
+    input_img = Input(list(image_size) + [3])
+    output_pose = Input(list(image_size) + [18])
+    input_pose = Input(list(image_size) + [18])
+    output_img = Input(list(image_size) + [3])
+
+    inputs = [input_img, output_pose]
+    if use_input_pose:
+        inputs.append(input_pose)
+    inputs.append(output_img)
+
+    out = Concatenate(axis=-1)(inputs)
     out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)
     out = block(out, 128)
     out = block(out, 256)
@@ -109,22 +136,24 @@ def make_discriminator(input_a, input_b):
     out = block(out, 1, bn=False)
     out = Activation('sigmoid')(out)
     out = Flatten()(out)
-    return Model(inputs=[input_a, input_b], outputs=[out])
+    return Model(inputs=inputs, outputs=[out])
 
 
 class CGAN(GAN):
-    def __init__(self, generator, discriminator, pose_estimator, l1_weigh_penalty=100, **kwargs):
+    def __init__(self, generator, discriminator, l1_penalty_weight, use_input_pose, **kwargs):
         super(CGAN, self).__init__(generator, discriminator, generator_optimizer=Adam(2e-4, 0.5, 0.999),
                                     discriminator_optimizer=Adam(2e-4, 0.5, 0.999), **kwargs)
      
-        self._l1_weigh_penalty = l1_weigh_penalty
-        self.generator_metric_names = ['gan_loss', 'l1_loss', 'pose_loss']
-        self._pose_penalty_weight = pose_penalty_weight
-        self._pose_estimator = pose_estimator
+        self._l1_penalty_weight= l1_penalty_weight
+        self.generator_metric_names = ['gan_loss', 'l1_loss']
+        self._use_input_pose = use_input_pose
 
     def _compile_generator_loss(self):
         gan_loss_fn = super(CGAN, self)._compile_generator_loss()[0]
-        l1_loss = self._l1_weigh_penalty * K.mean(K.abs(self._generator_input[1] - self._discriminator_fake_input[1]))
+        if self._use_input_pose:
+            l1_loss = self._l1_penalty_weight* K.mean(K.abs(self._generator_input[3] - self._discriminator_fake_input[3]))
+        else:
+            l1_loss = self._l1_penalty_weight * K.mean(K.abs(self._generator_input[2] - self._discriminator_fake_input[2]))
 
         def l1_loss_fn(y_true, y_pred):
             return l1_loss
@@ -133,4 +162,11 @@ class CGAN(GAN):
             return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred)
         return generator_loss, [gan_loss_fn, l1_loss_fn]
 
-
+    def compile_models(self):
+        if self._use_input_pose:
+            self._discriminator_fake_input = self._generator(self._generator_input)[:4]
+        else:
+            self._discriminator_fake_input = self._generator(self._generator_input)[:3]
+        if type(self._discriminator_fake_input) != list:
+            self._discriminator_fake_input = [self._discriminator_fake_input]
+        return self._compile_generator(), self._compile_discriminator()

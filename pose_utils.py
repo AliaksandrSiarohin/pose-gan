@@ -36,7 +36,8 @@ class CordinatesWarp(object):
         return res
 
     @staticmethod
-    def check_valid(kp):
+    def check_valid(kp_array):
+        kp = CordinatesWarp.give_name_to_keypoints(kp_array)
         return CordinatesWarp.check_keypoints_present(kp, ['Rhip', 'Lhip', 'Lsho', 'Rsho'])
 
     @staticmethod
@@ -125,8 +126,6 @@ class CordinatesWarp(object):
                 return
             poly_2 = CordinatesWarp.joint_poly(kp2, st2, fr, to, sz_fr, sz_to)
             poly_1 = CordinatesWarp.joint_poly(kp1, st1, fr, to, sz_fr, sz_to)
-
-            print (poly_1)
             CordinatesWarp.apply_transform(poly_1, poly_2, warp, bg_mask)
 
         joint_transform('Rhip', 'Rkne', [0.5, 0], [0.25, 0])
@@ -164,7 +163,7 @@ class CordinatesWarp(object):
         warp[..., 0] /= warp.shape[0]
         warp[..., 1] /= warp.shape[1]
 
-        return warp, bg_mask
+        return warp
 
 
 def map_to_cord(pose_map, threshold = 0.1):
