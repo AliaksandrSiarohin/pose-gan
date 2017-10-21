@@ -27,7 +27,7 @@ class PoseHMDataset(UGANDataset):
         self._batches_before_shuffle = int(self._annotations_file.shape[0] // self._batch_size)
 
     def number_of_batches_per_epoch(self):
-        return self._pairs_file.shape[0] // self._batch_size
+        return self._annotations_file.shape[0] // self._batch_size
 
     def compute_pose_map_batch(self, pair_df, direction):
         assert direction in ['to', 'from']
