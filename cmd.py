@@ -48,8 +48,8 @@ def parser():
                         help='Folder with real images for testing')
     parser.add_argument("--images_for_test", default=12000, type=int, help="Number of images for testing")
 
-    parser.add_argument("--use_input_pose", default=True, type=bool, help='Feed to generator input pose')
-    parser.add_argument("--use_warp_skip", default=True, type=bool, help="Use warping skip layers")
+    parser.add_argument("--use_input_pose", default=True, type=int, help='Feed to generator input pose')
+    parser.add_argument("--use_warp_skip", default=True, type=int, help="Use warping skip layers")
 
     parser.add_argument("--generated_images_dir", default='output/generated_images',
                         help='Folder with generated images from training dataset')
