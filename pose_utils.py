@@ -166,11 +166,12 @@ class CordinatesWarp(object):
         warp[..., 1] /= warp.shape[1]
 
         return warp
-
     @staticmethod
     def affine_transforms(array1, array2):
         kp1 = CordinatesWarp.give_name_to_keypoints(array1)
         kp2 = CordinatesWarp.give_name_to_keypoints(array2)
+
+        no_point_tr = np.array([[1, 0, 1000], [0, 1, 1000], [0, 0, 1]])
 
         def get_array_of_points(kp, names):
             return np.array([kp[name] for name in names])
@@ -189,11 +190,11 @@ class CordinatesWarp(object):
             tr = skimage.transform.estimate_transform('affine', dst=head_poly_1, src=head_poly_2)
             transforms.append(tr.params)
         else:
-            transforms.append(np.zeros((3, 3)))
+            transforms.append(no_point_tr)
 
         def estimate_join(fr, to, anchor):
             if not CordinatesWarp.check_keypoints_present(kp2, [fr, to]):
-                return np.zeros((3, 3))
+                return no_point_tr
             poly_2 = get_array_of_points(kp2, [fr, to, anchor])
             if CordinatesWarp.check_keypoints_present(kp1, [fr, to]):
                 poly_1 = get_array_of_points(kp1, [fr, to, anchor])
@@ -209,7 +210,7 @@ class CordinatesWarp(object):
                 if CordinatesWarp.check_keypoints_present(kp1, [fr, to]):
                     poly_1 = get_array_of_points(kp1, [fr, to, anchor])
                 else:
-                    return np.zeros((3, 3))
+                    return no_point_tr
             return skimage.transform.estimate_transform('affine', dst=poly_1, src=poly_2).params
 
         transforms.append(estimate_join('Rhip', 'Rkne', 'Rsho'))
