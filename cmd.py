@@ -7,7 +7,7 @@ def parser():
         Define args that is used in project
     """
     parser = argparse.ArgumentParser(description="Pose guided image generation usign deformable skip layers")
-    parser.add_argument("--output_dir", default='output/generated_samples', help="Directory with generated sample images")
+    parser.add_argument("--output_dir", default='output/displayed_samples', help="Directory with generated sample images")
     parser.add_argument("--batch_size", default=4, type=int, help='Size of the batch')
     parser.add_argument("--training_ratio", default=1, type=int,
                         help="The training ratio is the number of discriminator updates per generator update.")
@@ -50,5 +50,10 @@ def parser():
 
     parser.add_argument("--use_input_pose", default=True, type=bool, help='Feed to generator input pose')
     parser.add_argument("--use_warp_skip", default=True, type=bool, help="Use warping skip layers")
+
+    parser.add_argument("--generated_images_dir", default='output/generated_images',
+                        help='Folder with generated images from training dataset')
+    parser.add_argument("--generated_images_save_format", default='iog',
+                        help='Format of generated images i - input, o - output, g - generated')
 
     return parser

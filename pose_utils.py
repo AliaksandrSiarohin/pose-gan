@@ -36,8 +36,7 @@ class CordinatesWarp(object):
         return res
 
     @staticmethod
-    def check_valid(kp_array):
-        kp = CordinatesWarp.give_name_to_keypoints(kp_array)
+    def check_valid(kp):
         return CordinatesWarp.check_keypoints_present(kp, ['Rhip', 'Lhip', 'Lsho', 'Rsho'])
 
     @staticmethod
@@ -93,12 +92,13 @@ class CordinatesWarp(object):
 
         tr = skimage.transform.estimate_transform('affine', src=poly1[..., ::-1], dst=poly2[..., ::-1])
 
-        yy, xx = np.meshgrid(range(128), range(64), indexing='ij')
+        yy, xx = np.meshgrid(range(warp.shape[0]), range(warp.shape[1]), indexing='ij')
         yy = yy.reshape((-1, ))
         xx = xx.reshape((-1, ))
 
         new_cords = tr(np.vstack([yy, xx]).T)
-        new_cords = new_cords.reshape((128, 64, 2))
+        new_cords = new_cords.reshape((warp.shape[0], warp.shape[1], 2))
+
         warp[c1] = new_cords[c1]
 
     @staticmethod
@@ -126,6 +126,8 @@ class CordinatesWarp(object):
                 return
             poly_2 = CordinatesWarp.joint_poly(kp2, st2, fr, to, sz_fr, sz_to)
             poly_1 = CordinatesWarp.joint_poly(kp1, st1, fr, to, sz_fr, sz_to)
+
+            print (poly_1)
             CordinatesWarp.apply_transform(poly_1, poly_2, warp, bg_mask)
 
         joint_transform('Rhip', 'Rkne', [0.5, 0], [0.25, 0])
@@ -163,7 +165,7 @@ class CordinatesWarp(object):
         warp[..., 0] /= warp.shape[0]
         warp[..., 1] /= warp.shape[1]
 
-        return warp
+        return warp, bg_mask
 
 
 def map_to_cord(pose_map, threshold = 0.1):
@@ -174,30 +176,6 @@ def map_to_cord(pose_map, threshold = 0.1):
                                      pose_map > threshold))
     for x_i, y_i, z_i in zip(x, y, z):
         all_peaks[z_i].append([x_i, y_i])
-
-    
-    # for part in range(18):
-
-#         map_left = np.zeros(map.shape)
-#         map_left[1:, :] = map[:-1, :]
-#         map_right = np.zeros(map.shape)
-#         map_right[:-1, :] = map[1:, :]
-#         map_up = np.zeros(map.shape)
-#         map_up[:, 1:] = map[:, :-1]
-#         map_down = np.zeros(map.shape)
-#         map_down[:, :-1] = map[:, 1:]
-
-#         peaks_binary = np.logical_and.reduce(
-#             (map >= map_left, map >= map_right, map >= map_up, map >= map_down, map > threshold))
-
-#         peaks = zip(np.nonzero(peaks_binary)[1], np.nonzero(peaks_binary)[0])
-
-#         peaks_with_score = [x + (map_ori[x[1], x[0]],) for x in peaks]
-#         id = range(peak_counter, peak_counter + len(peaks))
-#         peaks_with_score_and_id = [peaks_with_score[i] + (id[i],) for i in range(len(id))]
-
-#         all_peaks.append(peaks_with_score_and_id)
-#        peak_counter += len(peaks)
 
     x_values = []
     y_values = []

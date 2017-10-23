@@ -41,5 +41,5 @@ if __name__ == "__main__":
     df_keypoints = pd.read_csv(args.annotations_file_test, sep=':')
     df = filter_not_valid(df_keypoints)
     pairs_df_test = make_pairs(df)
-    pairs_df_test = pairs_df_test.sample(n=args.images_for_test, replace=True)
+    pairs_df_test = pairs_df_test.sample(n=args.images_for_test, replace=False)
     pairs_df_test.to_csv(args.pairs_file_test, index=False)

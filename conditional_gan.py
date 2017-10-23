@@ -70,9 +70,11 @@ def make_generator(image_size, use_input_pose, use_warp_skip, batch_size):
     output_img = Input(list(image_size) + [3])
     warp = Input(list(image_size) + [2])
 
-    inputs = [input_img, output_pose]
+    inputs = [input_img]
     if use_input_pose:
         inputs.append(input_pose)
+    if not use_warp_skip:
+        inputs.append(output_pose)
     inp = Concatenate(axis=-1)(inputs)
 
     e1 = ZeroPadding2D((1, 1)) (inp)
@@ -88,11 +90,33 @@ def make_generator(image_size, use_input_pose, use_warp_skip, batch_size):
     #input is 4 x 2 x 512
     e6 = block(e5, 512, bn = False)
     #input is 2 x 1 x 512
+
     if use_warp_skip:
-        e1 = WarpLayer(batch_size)([e1, warp])
-        e2 = WarpLayer(batch_size)([e2, warp])
-        e3 = WarpLayer(batch_size)([e3, warp])
-        e4 = WarpLayer(batch_size)([e4, warp])
+        e1_pose = ZeroPadding2D((1, 1)) (output_pose)
+        e1_pose = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(e1_pose)
+        #input is 64 x 32 x 64
+        e2_pose = block(e1_pose, 128)
+        #input is 32 x 16 x 128
+        e3_pose = block(e2_pose, 256)
+        #input is 16 x 8 x 256
+        e4_pose = block(e3_pose, 512)
+        #input is 8 x 4 x 512
+        e5_pose = block(e4_pose, 512)
+        #input is 4 x 2 x 512
+        e6_pose = block(e5_pose, 512, bn=False)
+
+        e1_warp = WarpLayer(batch_size)([e1, warp])
+        e2_warp = WarpLayer(batch_size)([e2, warp])
+        e3_warp = WarpLayer(batch_size)([e3, warp])
+        e4_warp = WarpLayer(batch_size)([e4, warp])
+
+        e1 = Concatenate(axis=-1)([e1_pose, e1_warp])
+        e2 = Concatenate(axis=-1)([e2_pose, e2_warp])
+        e3 = Concatenate(axis=-1)([e3_pose, e3_warp])
+        e4 = Concatenate(axis=-1)([e4_pose, e4_warp])
+
+        e5 = Concatenate(axis=-1)([e5_pose, e5])
+        e6 = Concatenate(axis=-1)([e6_pose, e6])
 
     out = block(e6, 512, down=False, leaky=False, dropout = True)
     #input is 4 x 2 x 512  
@@ -113,6 +137,11 @@ def make_generator(image_size, use_input_pose, use_warp_skip, batch_size):
     #input is  128 x 64 x 128
     
     out = Activation('tanh')(out)
+
+    inputs = [input_img]
+    inputs.append(output_pose)
+    if use_input_pose:
+        inputs.append(input_pose)
 
     return Model(inputs=inputs + ([output_img, warp] if use_warp_skip else [output_img]), outputs=inputs + [out])
 

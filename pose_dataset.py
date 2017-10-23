@@ -7,13 +7,12 @@ from gan.dataset import UGANDataset
 import pose_utils
 
 from skimage.io import imread
-from tqdm import tqdm
 import pandas as pd
 import os
 
 class PoseHMDataset(UGANDataset):
     def __init__(self, images_dir, batch_size, image_size, pairs_file, annotations_file,
-                 use_input_pose, use_warp_skip):
+                 use_input_pose, use_warp_skip, shuffle=True):
         super(PoseHMDataset, self).__init__(batch_size, None)
         self._batch_size = batch_size
         self._image_size = image_size
@@ -23,6 +22,7 @@ class PoseHMDataset(UGANDataset):
         self._annotations_file = self._annotations_file.set_index('name')
         self._use_input_pose = use_input_pose
         self._use_warp_skip = use_warp_skip
+        self._shuffle = shuffle
 
         self._batches_before_shuffle = int(self._annotations_file.shape[0] // self._batch_size)
 
@@ -81,14 +81,16 @@ class PoseHMDataset(UGANDataset):
         return result
 
     def next_generator_sample(self):
-        index = np.random.choice(self._pairs_file.shape[0], size=self._batch_size)
+        index = self._next_data_index()
         return self.load_batch(index, False)
-    
-    def _load_discriminator_data(self, index):
+
+    def next_discriminator_sample(self):
+        index = self._next_data_index()
         return self.load_batch(index, True)
 
-    def _shuffle_discriminator_data(self):
-        self._pairs_file = self._pairs_file.sample(frac=1)
+    def _shuffle_data(self):
+        if self._shuffle:
+            self._pairs_file = self._pairs_file.sample(frac=1)
         
     def display(self, output_batch, input_batch):
         row = self._batch_size
