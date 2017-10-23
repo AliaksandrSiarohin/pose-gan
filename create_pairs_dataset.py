@@ -15,7 +15,7 @@ def filter_not_valid(df_keypoints):
 
 
 def make_pairs(df):
-    persons = df.apply(lambda x: '_'.join(x['name'].split('_')[0:2]), axis=1)
+    persons = df.apply(lambda x: '_'.join(x['name'].split('_')[0:1]), axis=1)
     df['person'] = persons
     fr, to = [], []
     for person in pd.unique(persons):
@@ -23,7 +23,6 @@ def make_pairs(df):
         if len(pairs) != 0:
             fr += list(pairs[0])
             to += list(pairs[1])
-
     pair_df = pd.DataFrame(index=range(len(fr)))
     pair_df['from'] = fr
     pair_df['to'] = to
@@ -41,5 +40,5 @@ if __name__ == "__main__":
     df_keypoints = pd.read_csv(args.annotations_file_test, sep=':')
     df = filter_not_valid(df_keypoints)
     pairs_df_test = make_pairs(df)
-    pairs_df_test = pairs_df_test.sample(n=args.images_for_test, replace=False)
+    pairs_df_test = pairs_df_test.sample(n=args.images_for_test, replace=False, random_state=0)
     pairs_df_test.to_csv(args.pairs_file_test, index=False)

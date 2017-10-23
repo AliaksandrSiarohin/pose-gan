@@ -4,6 +4,7 @@ from keras.layers.convolutional import Conv2D, Conv2DTranspose, ZeroPadding2D, C
 from keras_contrib.layers.normalization import InstanceNormalization
 from keras.layers.advanced_activations import LeakyReLU
 import keras.backend as K
+from tensorflow.contrib.image import transform as tf_affine_transform
 
 from gan.gan import GAN
 
@@ -44,6 +45,33 @@ class WarpLayer(Layer):
         return dict(list(base_config.items()) + list(config.items()))
 
 
+class AffineTransformLayer(Layer):
+    def __init__(self, affine_number, **kwargs):
+        self.affine_number = affine_number
+        super(AffineTransformLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.image_size = list(input_shape[0][1:])
+
+    def call(self, inputs):
+        expanded_tensor = ktf.expand_dims(inputs[0], -1)
+        multiples = [1, self.affine_number, 1, 1, 1]
+        tiled_tensor = ktf.tile(expanded_tensor, multiples=multiples)
+        repeated_tensor = ktf.reshape(tiled_tensor, ktf.shape(inputs[0]) * np.array([self.affine_number, 1, 1, 1]))
+        affine_transforms = ktf.reshape(inputs[1], (-1, 8))
+        tranformed = tf_affine_transform(repeated_tensor, affine_transforms)
+        res = ktf.reshape(tranformed, [-1, self.affine_number] + self.image_size)
+        res = ktf.transpose(res, [0, 2, 3, 1, 4])
+        return ktf.reshape(res, [-1] + self.image_size[:2] + [self.image_size[2] * self.affine_number])
+
+    def compute_output_shape(self, input_shape):
+        return tuple([input_shape[0][0]] + self.image_size[:2] + [self.image_size[2] * self.affine_number])
+
+    def get_config(self):
+        config = {"affine_number": self.affine_number}
+        base_config = super(AffineTransformLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
 def block(out, nkernels, down=True, bn=True, dropout=False, leaky=True):
     if leaky:
         out = LeakyReLU(0.2) (out)
@@ -62,13 +90,18 @@ def block(out, nkernels, down=True, bn=True, dropout=False, leaky=True):
     return out
     
     
-def make_generator(image_size, use_input_pose, use_warp_skip, batch_size):
+def make_generator(image_size, use_input_pose, warp_skip, batch_size):
     # input is 128 x 64 x nc
+    use_warp_skip = warp_skip != 'none'
     input_img = Input(list(image_size) + [3])
     output_pose = Input(list(image_size) + [18])
     input_pose = Input(list(image_size) + [18])
     output_img = Input(list(image_size) + [3])
-    warp = Input(list(image_size) + [2])
+    if warp_skip == 'mul':
+        warp = Input((10, 8))
+    else:
+        warp = Input(list(image_size) + [2])
+    encoder_dim = 64 if warp_skip != 'mul' else 8
 
     inputs = [input_img]
     if use_input_pose:
@@ -78,17 +111,17 @@ def make_generator(image_size, use_input_pose, use_warp_skip, batch_size):
     inp = Concatenate(axis=-1)(inputs)
 
     e1 = ZeroPadding2D((1, 1)) (inp)
-    e1 = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(e1)
+    e1 = Conv2D(encoder_dim, kernel_size=(4, 4), strides=(2, 2))(e1)
     #input is 64 x 32 x 64
-    e2 = block(e1, 128)
+    e2 = block(e1, encoder_dim * 2)
     #input is 32 x 16 x 128
-    e3 = block(e2, 256)
+    e3 = block(e2, encoder_dim * 4)
     #input is 16 x 8 x 256
-    e4 = block(e3, 512)
+    e4 = block(e3, encoder_dim * 8)
     #input is 8 x 4 x 512
-    e5 = block(e4, 512)
+    e5 = block(e4, encoder_dim * 8)
     #input is 4 x 2 x 512
-    e6 = block(e5, 512, bn = False)
+    e6 = block(e5, encoder_dim * 8, bn=False)
     #input is 2 x 1 x 512
 
     if use_warp_skip:
@@ -105,18 +138,27 @@ def make_generator(image_size, use_input_pose, use_warp_skip, batch_size):
         #input is 4 x 2 x 512
         e6_pose = block(e5_pose, 512, bn=False)
 
-        e1_warp = WarpLayer(batch_size)([e1, warp])
-        e2_warp = WarpLayer(batch_size)([e2, warp])
-        e3_warp = WarpLayer(batch_size)([e3, warp])
-        e4_warp = WarpLayer(batch_size)([e4, warp])
+        if warp_skip == 'sg':
+            e1_warp = WarpLayer(batch_size)([e1, warp])
+            e2_warp = WarpLayer(batch_size)([e2, warp])
+            e3_warp = WarpLayer(batch_size)([e3, warp])
+            e4_warp = WarpLayer(batch_size)([e4, warp])
+            e5_warp = e5
+            e6_warp = e6
+        else:
+            e1_warp = AffineTransformLayer(10)([e1, warp])
+            e2_warp = AffineTransformLayer(10)([e2, warp])
+            e3_warp = AffineTransformLayer(10)([e3, warp])
+            e4_warp = AffineTransformLayer(10)([e4, warp])
+            e5_warp = AffineTransformLayer(10)([e5, warp])
+            e6_warp = AffineTransformLayer(10)([e6, warp])
 
         e1 = Concatenate(axis=-1)([e1_pose, e1_warp])
         e2 = Concatenate(axis=-1)([e2_pose, e2_warp])
         e3 = Concatenate(axis=-1)([e3_pose, e3_warp])
         e4 = Concatenate(axis=-1)([e4_pose, e4_warp])
-
-        e5 = Concatenate(axis=-1)([e5_pose, e5])
-        e6 = Concatenate(axis=-1)([e6_pose, e6])
+        e5 = Concatenate(axis=-1)([e5_pose, e5_warp])
+        e6 = Concatenate(axis=-1)([e6_pose, e6_warp])
 
     out = block(e6, 512, down=False, leaky=False, dropout = True)
     #input is 4 x 2 x 512  

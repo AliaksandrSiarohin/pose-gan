@@ -36,7 +36,8 @@ class CordinatesWarp(object):
         return res
 
     @staticmethod
-    def check_valid(kp):
+    def check_valid(kp_array):
+        kp = CordinatesWarp.give_name_to_keypoints(kp_array)
         return CordinatesWarp.check_keypoints_present(kp, ['Rhip', 'Lhip', 'Lsho', 'Rsho'])
 
     @staticmethod
@@ -127,7 +128,6 @@ class CordinatesWarp(object):
             poly_2 = CordinatesWarp.joint_poly(kp2, st2, fr, to, sz_fr, sz_to)
             poly_1 = CordinatesWarp.joint_poly(kp1, st1, fr, to, sz_fr, sz_to)
 
-            print (poly_1)
             CordinatesWarp.apply_transform(poly_1, poly_2, warp, bg_mask)
 
         joint_transform('Rhip', 'Rkne', [0.5, 0], [0.25, 0])
@@ -165,7 +165,66 @@ class CordinatesWarp(object):
         warp[..., 0] /= warp.shape[0]
         warp[..., 1] /= warp.shape[1]
 
-        return warp, bg_mask
+        return warp
+
+    @staticmethod
+    def affine_transforms(array1, array2):
+        kp1 = CordinatesWarp.give_name_to_keypoints(array1)
+        kp2 = CordinatesWarp.give_name_to_keypoints(array2)
+
+        def get_array_of_points(kp, names):
+            return np.array([kp[name] for name in names])
+
+        transforms = []
+        body_poly_1 = get_array_of_points(kp1, ['Rhip', 'Lhip', 'Lsho', 'Rsho'])
+        body_poly_2 = get_array_of_points(kp2, ['Rhip', 'Lhip', 'Lsho', 'Rsho'])
+        tr = skimage.transform.estimate_transform('affine', src=body_poly_2, dst=body_poly_1)
+        transforms.append(tr.params)
+
+        head_present_1 = 'nose' in kp1
+        head_present_2 = 'nose' in kp2
+        if head_present_1 and head_present_2:
+            head_poly_1 = get_array_of_points(kp1, ['nose', 'Lsho', 'Rsho'])
+            head_poly_2 = get_array_of_points(kp2, ['nose', 'Lsho', 'Rsho'])
+            tr = skimage.transform.estimate_transform('affine', dst=head_poly_1, src=head_poly_2)
+            transforms.append(tr.params)
+        else:
+            transforms.append(np.zeros((3, 3)))
+
+        def estimate_join(fr, to, anchor):
+            if not CordinatesWarp.check_keypoints_present(kp2, [fr, to]):
+                return np.zeros((3, 3))
+            poly_2 = get_array_of_points(kp2, [fr, to, anchor])
+            if CordinatesWarp.check_keypoints_present(kp1, [fr, to]):
+                poly_1 = get_array_of_points(kp1, [fr, to, anchor])
+            else:
+                if fr[0]=='R':
+                    fr = fr.replace('R', 'L')
+                    to = to.replace('R', 'L')
+                    anchor = anchor.replace('R', 'L')
+                else:
+                    fr = fr.replace('L', 'R')
+                    to = to.replace('L', 'R')
+                    anchor = anchor.replace('L', 'R')
+                if CordinatesWarp.check_keypoints_present(kp1, [fr, to]):
+                    poly_1 = get_array_of_points(kp1, [fr, to, anchor])
+                else:
+                    return np.zeros((3, 3))
+            return skimage.transform.estimate_transform('affine', dst=poly_1, src=poly_2).params
+
+        transforms.append(estimate_join('Rhip', 'Rkne', 'Rsho'))
+        transforms.append(estimate_join('Lhip', 'Lkne', 'Lsho'))
+
+        transforms.append(estimate_join('Rkne', 'Rank', 'Rsho'))
+        transforms.append(estimate_join('Lkne', 'Lank', 'Lsho'))
+
+        transforms.append(estimate_join('Rsho', 'Relb', 'Rhip'))
+        transforms.append(estimate_join('Lsho', 'Lelb', 'Lhip'))
+
+        transforms.append(estimate_join('Relb', 'Rwri', 'Rsho'))
+        transforms.append(estimate_join('Lelb', 'Lwri', 'Lsho'))
+
+        return np.array(transforms).reshape((-1, 9))[..., :-1]
 
 
 def map_to_cord(pose_map, threshold = 0.1):

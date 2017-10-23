@@ -12,7 +12,7 @@ import os
 
 class PoseHMDataset(UGANDataset):
     def __init__(self, images_dir, batch_size, image_size, pairs_file, annotations_file,
-                 use_input_pose, use_warp_skip, shuffle=True):
+                 use_input_pose, warp_skip, shuffle=True):
         super(PoseHMDataset, self).__init__(batch_size, None)
         self._batch_size = batch_size
         self._image_size = image_size
@@ -21,7 +21,7 @@ class PoseHMDataset(UGANDataset):
         self._annotations_file = pd.read_csv(annotations_file, sep=':')
         self._annotations_file = self._annotations_file.set_index('name')
         self._use_input_pose = use_input_pose
-        self._use_warp_skip = use_warp_skip
+        self._warp_skip = warp_skip
         self._shuffle = shuffle
 
         self._batches_before_shuffle = int(self._annotations_file.shape[0] // self._batch_size)
@@ -41,7 +41,10 @@ class PoseHMDataset(UGANDataset):
         return batch
 
     def compute_cord_warp_batch(self, pair_df):
-        batch = np.empty([self._batch_size] + list(self._image_size) + [2])
+        if self._warp_skip == 'sg':
+            batch = np.empty([self._batch_size] + list(self._image_size) + [2])
+        else:
+            batch = np.empty([self._batch_size] + [10, 8])
         i = 0
         for _, p in pair_df.iterrows():
             fr = self._annotations_file.loc[p['from']]
@@ -50,7 +53,10 @@ class PoseHMDataset(UGANDataset):
                                                                 fr['keypoints_x'])
             kp_array2 = pose_utils.load_pose_cords_from_strings(to['keypoints_y'],
                                                                 to['keypoints_x'])
-            mask = pose_utils.CordinatesWarp.warp_mask(kp_array1, kp_array2, self._image_size)
+            if self._warp_skip == 'sg':
+                mask = pose_utils.CordinatesWarp.warp_mask(kp_array1, kp_array2, self._image_size)
+            else:
+                mask = pose_utils.CordinatesWarp.affine_transforms(kp_array1, kp_array2)
             batch[i] = mask
             i += 1
         return batch
@@ -76,7 +82,7 @@ class PoseHMDataset(UGANDataset):
         if self._use_input_pose:
             result.append(self.compute_pose_map_batch(pair_df, 'from'))
         result.append(self.load_image_batch(pair_df, 'to'))
-        if self._use_warp_skip and not for_discriminator:
+        if self._warp_skip != 'none' and not for_discriminator:
             result.append(self.compute_cord_warp_batch(pair_df))
         return result
 
@@ -98,7 +104,7 @@ class PoseHMDataset(UGANDataset):
 
         tg_app = self._deprocess_image(input_batch[0])
         tg_pose = input_batch[1]
-        if self._use_warp_skip:
+        if self._warp_skip != 'none':
             tg_img = input_batch[-2]
         else:
             tg_img = input_batch[-1]

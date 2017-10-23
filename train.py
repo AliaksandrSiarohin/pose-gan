@@ -8,7 +8,7 @@ from pose_dataset import PoseHMDataset
 def main():
     args = cmd.parser().parse_args()
 
-    generator = make_generator(args.image_size, args.use_input_pose, args.use_warp_skip, args.batch_size)
+    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.batch_size)
     if args.generator_checkpoint is not None:
         generator.load_weights(args.generator_checkpoint)
     
@@ -17,7 +17,7 @@ def main():
         discriminator.load_weights(args.discriminator_checkpoint)
     
     dataset = PoseHMDataset(args.images_dir_train, args.batch_size, args.image_size, args.pairs_file_train,
-                            args.annotations_file_train, args.use_input_pose, args.use_warp_skip)
+                            args.annotations_file_train, args.use_input_pose, args.warp_skip)
     
     gan = CGAN(generator, discriminator,   **vars(args))
     trainer = Trainer(dataset, gan, **vars(args))

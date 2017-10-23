@@ -45,12 +45,12 @@ def save_images(pairs_df, generated_images, images_folder, output_folder, img_sa
 def test():
     args = cmd.parser().parse_args()
 
-    generator = make_generator(args.image_size, args.use_input_pose, args.use_warp_skip, batch_size=1)
+    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, batch_size=1)
     assert (args.generator_checkpoint is not None)
     generator.load_weights(args.generator_checkpoint)
 
     dataset = PoseHMDataset(args.images_dir_test, 1, args.image_size, args.pairs_file_test,
-                            args.annotations_file_test, args.use_input_pose, args.use_warp_skip, shuffle=False)
+                            args.annotations_file_test, args.use_input_pose, args.warp_skip, shuffle=False)
 
     pairs_df = dataset._pairs_file
     print ("Generate images...")
