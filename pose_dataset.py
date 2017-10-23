@@ -23,6 +23,8 @@ class PoseHMDataset(UGANDataset):
         self._use_input_pose = use_input_pose
         self._warp_skip = warp_skip
         self._shuffle = shuffle
+        print ("Number of images: %s" % len(self._annotations_file))
+        print ("Number of pairs: %s" % len(self._pairs_file))
 
         self._batches_before_shuffle = int(self._annotations_file.shape[0] // self._batch_size)
 
