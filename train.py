@@ -8,7 +8,7 @@ from pose_dataset import PoseHMDataset
 def main():
     args = cmd.parser().parse_args()
 
-    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.batch_size)
+    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip)
     if args.generator_checkpoint is not None:
         generator.load_weights(args.generator_checkpoint)
     

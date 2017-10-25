@@ -13,6 +13,14 @@ from skimage.measure import compare_ssim
 import numpy as np
 
 
+def l1_score(pairs_df, generated_images, images_folder):
+    score_list = []
+    for df_row, generated_image in zip(pairs_df.iterrows(), generated_images):
+        reference_image = imread(os.path.join(images_folder, df_row[1]['to']))
+        score = np.abs(reference_image - generated_image).mean()
+        score_list.append(score / 255.0)
+    return np.mean(score_list)
+
 def ssim_score(pairs_df, generated_images, images_folder):
     ssim_score_list = []
     for df_row, generated_image in zip(pairs_df.iterrows(), generated_images):
@@ -45,7 +53,7 @@ def save_images(pairs_df, generated_images, images_folder, output_folder, img_sa
 def test():
     args = cmd.parser().parse_args()
 
-    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, batch_size=1)
+    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip)
     assert (args.generator_checkpoint is not None)
     generator.load_weights(args.generator_checkpoint)
 
@@ -54,7 +62,7 @@ def test():
 
     pairs_df = dataset._pairs_file
     print ("Generate images...")
-    generated_images = generate_images(dataset, generator, pairs_df.shape[0])
+    generated_images = generate_images(dataset, generator, pairs_df.shape[0], out_index=-2)
 
     print ("Save images to %s..." % (args.generated_images_dir, ))
     save_images(pairs_df, generated_images, args.images_dir_test,
@@ -66,7 +74,10 @@ def test():
     print ("Compute structured similarity score (SSIM)...")
     structured_score = ssim_score(pairs_df, generated_images, args.images_dir_test)
 
-    print ("Inception score = %s, SSIM score = %s" % (inception_score, structured_score))
+    print ("Compute l1 score...")
+    norm_score = l1_score(pairs_df, generated_images, args.images_dir_test)
+
+    print ("Inception score = %s, SSIM score = %s, l1 score = %s" % (inception_score, structured_score, norm_score))
 
 
 

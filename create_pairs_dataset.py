@@ -1,5 +1,6 @@
 import pandas as pd
 from cmd import parser
+import pose_transform
 import pose_utils
 from itertools import permutations
 
@@ -10,7 +11,7 @@ def filter_not_valid(df_keypoints):
     def check_valid(x):
         kp_array = pose_utils.load_pose_cords_from_strings(x['keypoints_y'], x['keypoints_x'])
         distractor = x['name'].startswith('-1') or x['name'].startswith('0000')
-        return pose_utils.CordinatesWarp.check_valid(kp_array) and not distractor
+        return pose_transform.check_valid(kp_array) and not distractor
     return df_keypoints[df_keypoints.apply(check_valid, axis=1)].copy()
 
 

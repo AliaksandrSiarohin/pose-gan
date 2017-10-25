@@ -49,7 +49,7 @@ def parser():
     parser.add_argument("--images_for_test", default=12000, type=int, help="Number of images for testing")
 
     parser.add_argument("--use_input_pose", default=True, type=int, help='Feed to generator input pose')
-    parser.add_argument("--warp_skip", default='none', choices=['none', 'sg', 'mul'],
+    parser.add_argument("--warp_skip", default='none', choices=['none', 'full', 'mask'],
                         help="Type of warping skip layers to use.")
 
     parser.add_argument("--generated_images_dir", default='output/generated_images',
