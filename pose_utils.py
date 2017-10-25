@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from collections import defaultdict
 import skimage.measure, skimage.transform
-
+import sys
 
 LIMB_SEQ = [[1,2], [1,5], [2,3], [3,4], [5,6], [6,7], [1,8], [8,9],
            [9,10], [1,11], [11,12], [12,13], [1,0], [0,14], [14,16],
@@ -172,15 +172,22 @@ class CordinatesWarp(object):
         kp2 = CordinatesWarp.give_name_to_keypoints(array2)
 
         no_point_tr = np.array([[1, 0, 1000], [0, 1, 1000], [0, 0, 1]])
+        
+        transforms = []
+        def to_transforms(tr):
+            if np.linalg.cond(tr) < 10000:
+                transforms.append(tr)
+            else:
+                transforms.append(no_point_tr)
 
         def get_array_of_points(kp, names):
             return np.array([kp[name] for name in names])
 
-        transforms = []
+        
         body_poly_1 = get_array_of_points(kp1, ['Rhip', 'Lhip', 'Lsho', 'Rsho'])
         body_poly_2 = get_array_of_points(kp2, ['Rhip', 'Lhip', 'Lsho', 'Rsho'])
         tr = skimage.transform.estimate_transform('affine', src=body_poly_2, dst=body_poly_1)
-        transforms.append(tr.params)
+        to_transforms(tr.params)
 
         head_present_1 = 'nose' in kp1
         head_present_2 = 'nose' in kp2
@@ -188,9 +195,9 @@ class CordinatesWarp(object):
             head_poly_1 = get_array_of_points(kp1, ['nose', 'Lsho', 'Rsho'])
             head_poly_2 = get_array_of_points(kp2, ['nose', 'Lsho', 'Rsho'])
             tr = skimage.transform.estimate_transform('affine', dst=head_poly_1, src=head_poly_2)
-            transforms.append(tr.params)
+            to_transforms(tr.params)
         else:
-            transforms.append(no_point_tr)
+            to_transforms(no_point_tr)
 
         def estimate_join(fr, to, anchor):
             if not CordinatesWarp.check_keypoints_present(kp2, [fr, to]):
@@ -213,17 +220,17 @@ class CordinatesWarp(object):
                     return no_point_tr
             return skimage.transform.estimate_transform('affine', dst=poly_1, src=poly_2).params
 
-        transforms.append(estimate_join('Rhip', 'Rkne', 'Rsho'))
-        transforms.append(estimate_join('Lhip', 'Lkne', 'Lsho'))
+        to_transforms(estimate_join('Rhip', 'Rkne', 'Rsho'))
+        to_transforms(estimate_join('Lhip', 'Lkne', 'Lsho'))
 
-        transforms.append(estimate_join('Rkne', 'Rank', 'Rsho'))
-        transforms.append(estimate_join('Lkne', 'Lank', 'Lsho'))
+        to_transforms(estimate_join('Rkne', 'Rank', 'Rsho'))
+        to_transforms(estimate_join('Lkne', 'Lank', 'Lsho'))
 
-        transforms.append(estimate_join('Rsho', 'Relb', 'Rhip'))
-        transforms.append(estimate_join('Lsho', 'Lelb', 'Lhip'))
+        to_transforms(estimate_join('Rsho', 'Relb', 'Rhip'))
+        to_transforms(estimate_join('Lsho', 'Lelb', 'Lhip'))
 
-        transforms.append(estimate_join('Relb', 'Rwri', 'Rsho'))
-        transforms.append(estimate_join('Lelb', 'Lwri', 'Lsho'))
+        to_transforms(estimate_join('Relb', 'Rwri', 'Rsho'))
+        to_transforms(estimate_join('Lelb', 'Lwri', 'Lsho'))
 
         return np.array(transforms).reshape((-1, 9))[..., :-1]
 
