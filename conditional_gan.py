@@ -6,6 +6,7 @@ from keras.layers.advanced_activations import LeakyReLU
 import keras.backend as K
 
 from gan.gan import GAN
+from gan.layer_utils import content_features_model
 
 from keras.optimizers import Adam
 from pose_transform import AffineTransformLayer
@@ -52,7 +53,7 @@ def decoder(skips, nfilters=(512, 512, 512, 256, 128, 3)):
     for i, (skip, nf) in enumerate(zip(skips, nfilters)):
         if 0 < i < 3:
             out = Concatenate(axis=-1)([out, skip])
-            out = block(out, nf, down=False, leaky=False, dropout = True)
+            out = block(out, nf, down=False, leaky=False, dropout=True)
         elif i == 0:
             out = block(skip, nf, down=False, leaky=False, dropout=True)
         elif i == len(nfilters) - 1:
@@ -67,9 +68,9 @@ def concatenate_skips(skips_app, skips_pose, warp, image_size):
     for i, (sk_app, sk_pose) in enumerate(zip(skips_app, skips_pose)):
         if i < 4:
             out = AffineTransformLayer(10, 'max', image_size) ([sk_app] + warp)
-            out = Concatenate(axis=-1) ([out, sk_pose])
+            out = Concatenate(axis=-1)([out, sk_pose])
         else:
-            out = Concatenate(axis=-1) ([sk_app, sk_pose])
+            out = Concatenate(axis=-1)([sk_app, sk_pose])
         skips.append(out)
     return skips
 
@@ -80,6 +81,9 @@ def make_generator(image_size, use_input_pose, warp_skip):
     input_img = Input(list(image_size) + [3])
     output_pose = Input(list(image_size) + [18])
     output_img = Input(list(image_size) + [3])
+
+    nfilters_decoder = (512, 512, 512, 256, 128, 3) if max(image_size) == 128 else (512, 512, 512, 512, 256, 128, 3)
+    nfilters_encoder = (64, 128, 256, 512, 512, 512) if max(image_size) == 128 else (64, 128, 256, 512, 512, 512, 512)
 
     if warp_skip == 'full':
         warp = [Input((10, 8))]
@@ -94,13 +98,13 @@ def make_generator(image_size, use_input_pose, warp_skip):
         input_pose = []
 
     if use_warp_skip:
-        enc_app_layers = encoder([input_img] + input_pose)
-        enc_tg_layers = encoder([output_pose])
+        enc_app_layers = encoder([input_img] + input_pose, nfilters_encoder)
+        enc_tg_layers = encoder([output_pose], nfilters_encoder)
         enc_layers = concatenate_skips(enc_app_layers, enc_tg_layers, warp, image_size)
     else:
-        enc_layers = encoder([input_img] + input_pose + [output_pose])
+        enc_layers = encoder([input_img] + input_pose + [output_pose], nfilters_encoder)
 
-    out = decoder(enc_layers[::-1])
+    out = decoder(enc_layers[::-1], nfilters_decoder)
 
     return Model(inputs=[input_img] + input_pose + [output_img, output_pose] + warp,
                  outputs=[input_img] + input_pose + [out, output_pose])
@@ -129,24 +133,35 @@ def make_discriminator(image_size, use_input_pose):
 
 
 class CGAN(GAN):
-    def __init__(self, generator, discriminator, l1_penalty_weight, use_input_pose, **kwargs):
+    def __init__(self, generator, discriminator, l1_penalty_weight, use_input_pose, image_size,
+                 content_loss_layer, **kwargs):
         super(CGAN, self).__init__(generator, discriminator, generator_optimizer=Adam(2e-4, 0.5, 0.999),
                                     discriminator_optimizer=Adam(2e-4, 0.5, 0.999), **kwargs)
         generator.summary()
         self._l1_penalty_weight= l1_penalty_weight
         self.generator_metric_names = ['gan_loss', 'l1_loss']
         self._use_input_pose = use_input_pose
+        self._image_size = image_size
+        self._content_loss_layer = content_loss_layer
 
     def _compile_generator_loss(self):
         gan_loss_fn = super(CGAN, self)._compile_generator_loss()[0]
-        if self._use_input_pose:
-            l1_loss = self._l1_penalty_weight * K.mean(K.abs(self._generator_input[2] - self._discriminator_fake_input[2]))
+
+        image_index = 2 if self._use_input_pose else 1
+
+        if self._content_loss_layer != 'none':
+            cf_model = content_features_model(self._image_size, self._content_loss_layer)
+            reference = cf_model(self._generator_input[image_index])
+            target = cf_model(self._discriminator_fake_input[image_index])
         else:
-            l1_loss = self._l1_penalty_weight * K.mean(K.abs(self._generator_input[1] - self._discriminator_fake_input[1]))
+            reference = self._generator_input[image_index]
+            target = self._discriminator_fake_input[image_index]
+
+        l1_loss = self._l1_penalty_weight * K.mean(K.abs(reference - target))
 
         def l1_loss_fn(y_true, y_pred):
             return l1_loss
-        
+
         def generator_loss(y_true, y_pred):
             return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred)
         return generator_loss, [gan_loss_fn, l1_loss_fn]

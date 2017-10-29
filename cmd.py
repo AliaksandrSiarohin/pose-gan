@@ -15,6 +15,9 @@ def parser():
     parser.add_argument("--l1_penalty_weight", default=100, type=float, help='Weight of gradient penalty loss')
     parser.add_argument("--number_of_epochs", default=200, type=int, help="Number of training epochs")
 
+    parser.add_argument("--content_loss_layer", default='none', help='Name of content layer (vgg19)'
+                                                                     ' e.g. block4_conv1 or none')
+
     parser.add_argument("--checkpoints_dir", default="output/checkpoints", help="Folder with checkpoints")
     parser.add_argument("--checkpoint_ratio", default=10, type=int, help="Number of epochs between consecutive checkpoints")
     parser.add_argument("--generator_checkpoint", default=None, help="Previosly saved model of generator")
