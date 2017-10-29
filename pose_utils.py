@@ -3,8 +3,8 @@ from scipy.ndimage.filters import gaussian_filter
 from skimage.draw import circle, line_aa
 import json
 
-import matplotlib
-matplotlib.use('Agg')
+# import matplotlib
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from collections import defaultdict
@@ -26,13 +26,10 @@ LABELS = ['nose', 'neck', 'Rsho', 'Relb', 'Rwri', 'Lsho', 'Lelb', 'Lwri',
 MISSING_VALUE = -1
 
 
-
-
-
-def map_to_cord(pose_map, threshold = 0.1):
+def map_to_cord(pose_map, threshold=0.1):
     all_peaks = [[] for i in range(18)]
     pose_map = pose_map[..., :18]
-       
+
     y, x, z = np.where(np.logical_and(pose_map == pose_map.max(axis = (0, 1)),
                                      pose_map > threshold))
     for x_i, y_i, z_i in zip(x, y, z):
@@ -114,41 +111,15 @@ if __name__ == "__main__":
     import pylab as plt
     import os
     i = 5
-    df = pd.read_csv('cao-hpe/annotations.csv', sep=':')
-    output_folder = 'train-annotated'
-    input_folder = '../market-dataset/bounding_box_train'
-
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    df = pd.read_csv('data/market-annotation-train.csv', sep=':')
 
     for index, row in df.iterrows():
-        if row['name'] != '0002_c1s1_000551_01.jpg':
-            continue
-        img = imread(os.path.join(input_folder, row['name']))
-        print (row['name'])
         pose_cords = load_pose_cords_from_strings(row['keypoints_y'], row['keypoints_x'])
 
-        map = cords_to_map(pose_cords, (128, 64))
+        colors, mask = draw_pose_from_cords(pose_cords, (128, 64))
+        img = imread('data/market-dataset/train/' + row['name'])
 
-        colors, mask = draw_pose_from_map(map)
-
-#         img[mask] = colors[mask]
-
-#         a_not_resized=np.load(row['name'] + '.npy')
-#         #a_resized = resize(a_not_resized, output_shape=(128, 64), preserve_range=True)
-#         print (pose_cords[1])
-#         print (map[..., 1].mean())
-
-#         from scipy.optimize import minimize_scalar
-#         fn = lambda sigma: np.sum((cords_to_map(pose_cords, (128, 64), sigma) - a_not_resized[..., :18]) ** 2)
-#         a = minimize_scalar(fn, bounds=(0, 21))
-#         print (a)
-
-        #print (map.max(axis=2))
-        plt.imshow(colors, cmap=plt.cm.gray_r)
-        draw_legend()
-        plt.savefig(os.path.join(output_folder, row['name'] +'_joints.png'))
-
-        # plt.imshow(a_not_resized[..., 1], cmap=plt.cm.gray_r)
-        # draw_legend()
-        # plt.savefig(os.path.join(output_folder, row['name'] +'_img_joints.png'))
+        img[mask] = colors[mask]
+        plt.subplot(1, 1, 1)
+        plt.imshow(img)
+        plt.show()

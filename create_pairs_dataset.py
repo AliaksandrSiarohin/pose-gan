@@ -1,10 +1,10 @@
 import pandas as pd
-from cmd import parser
+from cmd import args
 import pose_transform
 import pose_utils
 from itertools import permutations
 
-args = parser().parse_args()
+args = args()
 
 
 def filter_not_valid(df_keypoints):
@@ -41,5 +41,5 @@ if __name__ == "__main__":
     df_keypoints = pd.read_csv(args.annotations_file_test, sep=':')
     df = filter_not_valid(df_keypoints)
     pairs_df_test = make_pairs(df)
-    pairs_df_test = pairs_df_test.sample(n=args.images_for_test, replace=False, random_state=0)
+    pairs_df_test = pairs_df_test.sample(n=min(args.images_for_test, pairs_df_test.shape[0]), replace=False, random_state=0)
     pairs_df_test.to_csv(args.pairs_file_test, index=False)

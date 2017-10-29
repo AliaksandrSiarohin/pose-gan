@@ -6,7 +6,7 @@ from pose_dataset import PoseHMDataset
 
 
 def main():
-    args = cmd.parser().parse_args()
+    args = cmd.args()
 
     generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip)
     if args.generator_checkpoint is not None:

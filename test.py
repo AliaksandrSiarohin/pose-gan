@@ -51,7 +51,7 @@ def save_images(pairs_df, generated_images, images_folder, output_folder, img_sa
 
 
 def test():
-    args = cmd.parser().parse_args()
+    args = cmd.args()
 
     generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip)
     assert (args.generator_checkpoint is not None)
