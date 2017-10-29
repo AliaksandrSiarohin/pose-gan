@@ -3,8 +3,8 @@ from scipy.ndimage.filters import gaussian_filter
 from skimage.draw import circle, line_aa
 import json
 
-# import matplotlib
-# matplotlib.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from collections import defaultdict

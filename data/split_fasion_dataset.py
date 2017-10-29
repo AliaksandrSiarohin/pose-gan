@@ -8,7 +8,7 @@ import shutil
 
 ids_for_test = 1000
 output_folder = 'fasion-dataset'
-output_folder_test = os.path.join(output_folder, 'test_1')
+output_folder_test = os.path.join(output_folder, 'test')
 output_folder_train = os.path.join(output_folder, 'train')
 
 def get_id(image_path):
