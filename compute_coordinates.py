@@ -156,16 +156,20 @@ def compute_cordinates(heatmap_avg, paf_avg, th1=0.1, th2=0.05):
             deleteIdx.append(i)
     subset = np.delete(subset, deleteIdx, axis=0)
 
+    if len(subset) == 0:
+        return np.array([[-1, -1]] * 18).astype(int)
+
     cordinates = []
     result_image_index = np.argmax(subset[:, -2])
+
     for part in subset[result_image_index, :18]:
         if part == -1:
             cordinates.append([-1, -1])
         else:
             Y = candidate[part.astype(int), 0]
             X = candidate[part.astype(int), 1]
-            cordinates.append([Y, X])
-    return np.array(cordinates)
+            cordinates.append([X, Y])
+    return np.array(cordinates).astype(int)
 
 for dataset in ['train', 'test']:
     input_folder = vars(args)['images_dir_' + dataset]
@@ -210,7 +214,7 @@ for dataset in ['train', 'test']:
 
         heatmap_avg /= len(multiplier)
 
-        pose_cords = pose_utils.map_to_cord(heatmap_avg, threshold=threshold)
+        pose_cords = compute_cordinates(heatmap_avg, paf_avg)
 
         print >> result_file, "%s: %s: %s" % (image_name, str(list(pose_cords[:, 0])), str(list(pose_cords[:, 1])))
         result_file.flush()
