@@ -2,6 +2,8 @@ from keras.models import Input, Model
 from keras.engine.topology import Layer
 from keras.backend import tf as ktf
 
+
+import pose_utils
 import pylab as plt
 import numpy as np
 from skimage.io import imread
@@ -10,7 +12,7 @@ from skimage.transform import warp_coords
 import skimage.measure
 import skimage.transform
 
-import pose_utils
+
 from pose_utils import LABELS, MISSING_VALUE
 from tensorflow.contrib.image import transform as tf_affine_transform
 
