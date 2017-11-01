@@ -132,39 +132,62 @@ def make_discriminator(image_size, use_input_pose):
     return Model(inputs=[input_img] + input_pose + [output_img, output_pose], outputs=[out])
 
 
+def total_variation_loss(x, image_size):
+    img_nrows, img_ncols = image_size
+    assert K.ndim(x) == 4
+    if K.image_data_format() == 'channels_first':
+        a = K.square(x[:, :, :img_nrows - 1, :img_ncols - 1] - x[:, :, 1:, :img_ncols - 1])
+        b = K.square(x[:, :, :img_nrows - 1, :img_ncols - 1] - x[:, :, :img_nrows - 1, 1:])
+    else:
+        a = K.square(x[:, :img_nrows - 1, :img_ncols - 1, :] - x[:, 1:, :img_ncols - 1, :])
+        b = K.square(x[:, :img_nrows - 1, :img_ncols - 1, :] - x[:, :img_nrows - 1, 1:, :])
+    return K.sum(K.pow(a + b, 1.25))
+
+
 class CGAN(GAN):
-    def __init__(self, generator, discriminator, l1_penalty_weight, use_input_pose, image_size,
-                 content_loss_layer, **kwargs):
+    def __init__(self, generator, discriminator, l1_penalty_weight, gan_penalty_weight, use_input_pose, image_size,
+                 content_loss_layer, tv_penalty_weight, **kwargs):
         super(CGAN, self).__init__(generator, discriminator, generator_optimizer=Adam(2e-4, 0.5, 0.999),
                                     discriminator_optimizer=Adam(2e-4, 0.5, 0.999), **kwargs)
         generator.summary()
         self._l1_penalty_weight= l1_penalty_weight
-        self.generator_metric_names = ['gan_loss', 'l1_loss']
+        self.generator_metric_names = ['gan_loss', 'l1_loss', 'tv_loss']
         self._use_input_pose = use_input_pose
         self._image_size = image_size
         self._content_loss_layer = content_loss_layer
+        self._gan_penalty_weight = gan_penalty_weight
+        self._tv_penalty_weight = tv_penalty_weight
 
     def _compile_generator_loss(self):
-        gan_loss_fn = super(CGAN, self)._compile_generator_loss()[0]
-
         image_index = 2 if self._use_input_pose else 1
-
+        
+        
         if self._content_loss_layer != 'none':
-            cf_model = content_features_model(self._image_size, self._content_loss_layer)
+            layer_name = self._content_loss_layer.split(',')
+            cf_model = content_features_model(self._image_size, layer_name)
             reference = cf_model(self._generator_input[image_index])
             target = cf_model(self._discriminator_fake_input[image_index])
+            l1_loss = K.constant(0)
+            for a, b in zip(reference, target):
+                l1_loss = l1_loss + self._l1_penalty_weight * K.mean(K.abs(a - b))
         else:
             reference = self._generator_input[image_index]
             target = self._discriminator_fake_input[image_index]
-
-        l1_loss = self._l1_penalty_weight * K.mean(K.abs(reference - target))
-
+            l1_loss = self._l1_penalty_weight * K.mean(K.abs(reference - target))
+        
+        def tv_loss(y_true, y_pred):
+            return self._tv_penalty_weight * total_variation_loss(self._discriminator_fake_input[image_index], self._image_size)
+        
         def l1_loss_fn(y_true, y_pred):
             return l1_loss
-
+        
+        def gan_loss_fn(y_true, y_pred):
+            loss = super(CGAN, self)._compile_generator_loss()[0](y_true, y_pred)
+            return K.constant(0) if self._gan_penalty_weight == 0 else self._gan_penalty_weight * loss
+            
         def generator_loss(y_true, y_pred):
-            return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred)
-        return generator_loss, [gan_loss_fn, l1_loss_fn]
+            return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred) + tv_loss(y_true, y_pred)
+        return generator_loss, [gan_loss_fn, l1_loss_fn, tv_loss]
 
     def compile_models(self):
         if self._use_input_pose:

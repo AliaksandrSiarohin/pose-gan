@@ -12,7 +12,11 @@ def args():
     parser.add_argument("--training_ratio", default=1, type=int,
                         help="The training ratio is the number of discriminator updates per generator update.")
 
-    parser.add_argument("--l1_penalty_weight", default=100, type=float, help='Weight of gradient penalty loss')
+    parser.add_argument("--l1_penalty_weight", default=100, type=float, help='Weight of l1 loss')
+    parser.add_argument('--gan_penalty_weight', default=1, type=float, help='Weight of GAN loss')
+    parser.add_argument('--tv_penalty_weight', default=1e-4, type=float, help='Weight of total variation loss')
+    
+    
     parser.add_argument("--number_of_epochs", default=200, type=int, help="Number of training epochs")
 
     parser.add_argument("--content_loss_layer", default='none', help='Name of content layer (vgg19)'
