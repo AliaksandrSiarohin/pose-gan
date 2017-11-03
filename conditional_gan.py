@@ -1,5 +1,5 @@
 from keras.models import Model, Input
-from keras.layers import Flatten, Concatenate, Activation, Dropout
+from keras.layers import Flatten, Concatenate, Activation, Dropout, Dense
 from keras.layers.convolutional import Conv2D, Conv2DTranspose, ZeroPadding2D, Cropping2D
 from keras_contrib.layers.normalization import InstanceNormalization
 from keras.layers.advanced_activations import LeakyReLU
@@ -38,8 +38,7 @@ def encoder(inps, nfilters=(64, 128, 256, 512, 512, 512)):
         out = inps[0]
     for i, nf in enumerate(nfilters):
         if i == 0:
-            out = ZeroPadding2D((1, 1))(out)
-            out = Conv2D(nf, kernel_size=(4, 4), strides=(2, 2))(out)
+            out = Conv2D(nf, kernel_size=(3, 3), padding='same')(out)
         elif i == len(nfilters) - 1:
             out = block(out, nf, bn=False)
         else:
@@ -57,8 +56,11 @@ def decoder(skips, nfilters=(512, 512, 512, 256, 128, 3)):
         elif i == 0:
             out = block(skip, nf, down=False, leaky=False, dropout=True)
         elif i == len(nfilters) - 1:
-            out = block(out, nf, down=False, leaky=False, bn=False)
+            out = Concatenate(axis=-1)([out, skip])
+            out = Activation('relu') (out)
+            out = Conv2D(nf, kernel_size=(3, 3), use_bias=True, padding='same')(out)
         else:
+            out = Concatenate(axis=-1)([out, skip])
             out = block(out, nf, down=False, leaky=False)
     out = Activation('tanh')(out)
     return out
@@ -75,7 +77,7 @@ def concatenate_skips(skips_app, skips_pose, warp, image_size):
     return skips
 
 
-def make_generator(image_size, use_input_pose, warp_skip):
+def make_generator(image_size, use_input_pose, warp_skip, disc_type):
     # input is 128 x 64 x nc
     use_warp_skip = warp_skip != 'none'
     input_img = Input(list(image_size) + [3])
@@ -88,7 +90,7 @@ def make_generator(image_size, use_input_pose, warp_skip):
     if warp_skip == 'full':
         warp = [Input((10, 8))]
     elif warp_skip == 'mask':
-        warp = [Input((10, 8)), Input((10, 128, 64))]
+        warp = [Input((10, 8)), Input((10, image_size[0], image_size[1]))]
     else:
         warp = []
 
@@ -105,31 +107,76 @@ def make_generator(image_size, use_input_pose, warp_skip):
         enc_layers = encoder([input_img] + input_pose + [output_pose], nfilters_encoder)
 
     out = decoder(enc_layers[::-1], nfilters_decoder)
+    
+    warp_in_disc = [] if disc_type != 'warp' else warp
 
     return Model(inputs=[input_img] + input_pose + [output_img, output_pose] + warp,
-                 outputs=[input_img] + input_pose + [out, output_pose])
+                 outputs=[input_img] + input_pose + [out, output_pose] + warp_in_disc)
 
 
-def make_discriminator(image_size, use_input_pose):
+def make_discriminator(image_size, use_input_pose, warp_skip, disc_type):
     input_img = Input(list(image_size) + [3])
     output_pose = Input(list(image_size) + [18])
     input_pose = Input(list(image_size) + [18])
     output_img = Input(list(image_size) + [3])
-
+    
+    if warp_skip == 'full':
+        warp = [Input((10, 8))]
+    elif warp_skip == 'mask':
+        warp = [Input((10, 8)), Input((10, image_size[0], image_size[1]))]
+    else:
+        warp = []
+    
     if use_input_pose:
         input_pose = [input_pose]
     else:
         input_pose = []
-
-    out = Concatenate(axis=-1)([input_img] + input_pose + [output_img, output_pose])
-    out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)
-    out = block(out, 128)
-    out = block(out, 256)
-    out = block(out, 512)
-    out = block(out, 1, bn=False)
-    out = Activation('sigmoid')(out)
-    out = Flatten()(out)
-    return Model(inputs=[input_img] + input_pose + [output_img, output_pose], outputs=[out])
+    
+    if disc_type == 'call':
+        out = Concatenate(axis=-1)([input_img] + input_pose + [output_img, output_pose])
+        out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)
+        out = block(out, 128)
+        out = block(out, 256)
+        out = block(out, 512)
+        out = block(out, 1, bn=False)
+        out = Activation('sigmoid')(out)
+        out = Flatten()(out)
+        return Model(inputs=[input_img] + input_pose + [output_img, output_pose], outputs=[out])
+    elif disc_type == 'sim':
+        out = Concatenate(axis=-1)([output_img, output_pose])
+        out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)
+        out = block(out, 128)
+        out = block(out, 256)
+        out = block(out, 512)
+        m_share = Model(inputs = [output_img, output_pose], outputs = [out])
+        output_feat = m_share([output_img, output_pose])
+        input_feat = m_share([input_img] + input_pose)
+        
+        out = Concatenate(axis=-1) ([output_feat, input_feat])
+        out = LeakyReLU(0.2) (out)
+        out = Flatten() (out)
+        out = Dense(1) (out)
+        out = Activation('sigmoid')(out)
+        
+        return Model(inputs=[input_img] + input_pose + [output_img, output_pose], outputs=[out])
+    else:
+        out_inp = Concatenate(axis=-1)([input_img] + input_pose)
+        out_inp = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out_inp)        
+        
+        out_inp = AffineTransformLayer(10, 'max', image_size) ([out_inp] + warp)
+        
+        out = Concatenate(axis=-1)([output_img, output_pose])
+        out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)
+        
+        out = Concatenate(axis=-1)([out, out_inp])
+        
+        out = block(out, 128)
+        out = block(out, 256)
+        out = block(out, 512)
+        out = block(out, 1, bn=False)
+        out = Activation('sigmoid')(out)
+        out = Flatten()(out)
+        return Model(inputs=[input_img] + input_pose + [output_img, output_pose] + warp, outputs=[out])
 
 
 def total_variation_loss(x, image_size):
@@ -168,6 +215,9 @@ class CGAN(GAN):
             reference = cf_model(self._generator_input[image_index])
             target = cf_model(self._discriminator_fake_input[image_index])
             l1_loss = K.constant(0)
+            if type(reference) != list:
+                reference = [reference]
+                target = [target]
             for a, b in zip(reference, target):
                 l1_loss = l1_loss + self._l1_penalty_weight * K.mean(K.abs(a - b))
         else:
@@ -189,11 +239,11 @@ class CGAN(GAN):
             return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred) + tv_loss(y_true, y_pred)
         return generator_loss, [gan_loss_fn, l1_loss_fn, tv_loss]
 
-    def compile_models(self):
-        if self._use_input_pose:
-            self._discriminator_fake_input = self._generator(self._generator_input)[:4]
-        else:
-            self._discriminator_fake_input = self._generator(self._generator_input)[:3]
-        if type(self._discriminator_fake_input) != list:
-            self._discriminator_fake_input = [self._discriminator_fake_input]
-        return self._compile_generator(), self._compile_discriminator()
+    # def compile_models(self):
+    #     if self._use_input_pose:
+    #         self._discriminator_fake_input = self._generator(self._generator_input)[:4]
+    #     else:
+    #         self._discriminator_fake_input = self._generator(self._generator_input)[:3]
+    #     if type(self._discriminator_fake_input) != list:
+    #         self._discriminator_fake_input = [self._discriminator_fake_input]
+    #     return self._compile_generator(), self._compile_discriminator()

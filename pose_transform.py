@@ -19,7 +19,7 @@ from tensorflow.contrib.image import transform as tf_affine_transform
 
 class AffineTransformLayer(Layer):
     def __init__(self, number_of_transforms, aggregation_fn, init_image_size, **kwargs):
-        assert aggregation_fn in ['none', 'max']
+        assert aggregation_fn in ['none', 'max', 'avg']
         self.aggregation_fn = aggregation_fn
         self.number_of_transforms = number_of_transforms
         self.init_image_size = init_image_size
@@ -51,10 +51,17 @@ class AffineTransformLayer(Layer):
             mask = ktf.image.resize_images(mask, self.image_size[:2], method=ktf.image.ResizeMethod.NEAREST_NEIGHBOR)
             res = res * ktf.expand_dims(mask, axis=-1)
 
+
         if self.aggregation_fn == 'none':
             res = ktf.reshape(res, [-1] + self.image_size[:2] + [self.image_size[2] * self.number_of_transforms])
         elif self.aggregation_fn == 'max':
             res = ktf.reduce_max(res, reduction_indices=[-2])
+        elif self.aggregation_fn == 'avg':
+            counts = ktf.reduce_sum(mask, reduction_indices=[-1])
+            counts = ktf.expand_dims(counts, axis=-1)
+            res = ktf.reduce_sum(res, reduction_indices=[-2])
+            res /= counts
+            res = ktf.where(ktf.is_nan(res), ktf.zeros_like(res), res)
         return res
 
     def compute_output_shape(self, input_shape):

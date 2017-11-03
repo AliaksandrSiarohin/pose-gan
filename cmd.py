@@ -14,7 +14,7 @@ def args():
 
     parser.add_argument("--l1_penalty_weight", default=100, type=float, help='Weight of l1 loss')
     parser.add_argument('--gan_penalty_weight', default=1, type=float, help='Weight of GAN loss')
-    parser.add_argument('--tv_penalty_weight', default=1e-4, type=float, help='Weight of total variation loss')
+    parser.add_argument('--tv_penalty_weight', default=0, type=float, help='Weight of total variation loss')
     
     
     parser.add_argument("--number_of_epochs", default=200, type=int, help="Number of training epochs")
@@ -42,11 +42,16 @@ def args():
     parser.add_argument("--use_input_pose", default=True, type=int, help='Feed to generator input pose')
     parser.add_argument("--warp_skip", default='none', choices=['none', 'full', 'mask'],
                         help="Type of warping skip layers to use.")
+    parser.add_argument("--disc_type", default='call', choices=['call', 'sim', 'warp'],
+                        help="Type of discriminator call - concat all, sim - siamease, sharewarp - warp.")
+
 
     parser.add_argument("--generated_images_dir", default='output/generated_images',
                         help='Folder with generated images from training dataset')
     parser.add_argument("--generated_images_save_format", default='iog',
                         help='Format of generated images i - input, o - output, g - generated')
+    
+    
 
     args = parser.parse_args()
 
@@ -60,6 +65,8 @@ def args():
     args.pairs_file_test = 'data/' + args.dataset + '-pairs-test.csv'
 
     args.image_size = (128, 64) if args.dataset == 'market' else (256, 256)
+    
+    args.tmp_pose_dir = 'tmp/' + args.dataset + '/'
 
     del args.dataset
 
