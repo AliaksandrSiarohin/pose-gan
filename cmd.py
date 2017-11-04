@@ -28,7 +28,7 @@ def args():
     parser.add_argument("--discriminator_checkpoint", default=None, help="Previosly saved model of discriminator")
 
 
-    parser.add_argument('--dataset', default='market', choices=['market', 'fasion'],
+    parser.add_argument('--dataset', default='market', choices=['market', 'fasion', 'fasion128'],
                         help='Market or fasion')
 
 
@@ -67,7 +67,7 @@ def args():
     args.pairs_file_train = 'data/' + args.dataset + '-pairs-train.csv'
     args.pairs_file_test = 'data/' + args.dataset + '-pairs-test.csv'
 
-    args.image_size = (128, 64) if args.dataset == 'market' else (256, 256)
+    args.image_size = (256, 256) if args.dataset == 'fasion' else (128, 64)
     
     args.tmp_pose_dir = 'tmp/' + args.dataset + '/'
 
