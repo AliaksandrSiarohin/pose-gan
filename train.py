@@ -8,11 +8,11 @@ from pose_dataset import PoseHMDataset
 def main():
     args = cmd.args()
 
-    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type)
+    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type, args.warp_agg)
     if args.generator_checkpoint is not None:
         generator.load_weights(args.generator_checkpoint)
     
-    discriminator = make_discriminator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type)
+    discriminator = make_discriminator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type, args.warp_agg)
     if args.discriminator_checkpoint is not None:
         discriminator.load_weights(args.discriminator_checkpoint)
     

@@ -42,6 +42,9 @@ def args():
     parser.add_argument("--use_input_pose", default=True, type=int, help='Feed to generator input pose')
     parser.add_argument("--warp_skip", default='none', choices=['none', 'full', 'mask'],
                         help="Type of warping skip layers to use.")
+    parser.add_argument("--warp_agg", default='max', choices=['max', 'avg'],
+                        help="Type of aggregation.")
+    
     parser.add_argument("--disc_type", default='call', choices=['call', 'sim', 'warp'],
                         help="Type of discriminator call - concat all, sim - siamease, sharewarp - warp.")
 

@@ -53,7 +53,7 @@ def save_images(pairs_df, generated_images, images_folder, output_folder, img_sa
 def test():
     args = cmd.args()
 
-    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type)
+    generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type, args.warp_agg)
     assert (args.generator_checkpoint is not None)
     generator.load_weights(args.generator_checkpoint)
 

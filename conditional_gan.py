@@ -65,11 +65,11 @@ def decoder(skips, nfilters=(512, 512, 512, 256, 128, 3)):
     out = Activation('tanh')(out)
     return out
 
-def concatenate_skips(skips_app, skips_pose, warp, image_size):
+def concatenate_skips(skips_app, skips_pose, warp, image_size, warp_agg):
     skips = []
     for i, (sk_app, sk_pose) in enumerate(zip(skips_app, skips_pose)):
         if i < 4:
-            out = AffineTransformLayer(10, 'max', image_size) ([sk_app] + warp)
+            out = AffineTransformLayer(10, warp_agg, image_size) ([sk_app] + warp)
             out = Concatenate(axis=-1)([out, sk_pose])
         else:
             out = Concatenate(axis=-1)([sk_app, sk_pose])
@@ -77,7 +77,7 @@ def concatenate_skips(skips_app, skips_pose, warp, image_size):
     return skips
 
 
-def make_generator(image_size, use_input_pose, warp_skip, disc_type):
+def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg):
     # input is 128 x 64 x nc
     use_warp_skip = warp_skip != 'none'
     input_img = Input(list(image_size) + [3])
@@ -102,7 +102,7 @@ def make_generator(image_size, use_input_pose, warp_skip, disc_type):
     if use_warp_skip:
         enc_app_layers = encoder([input_img] + input_pose, nfilters_encoder)
         enc_tg_layers = encoder([output_pose], nfilters_encoder)
-        enc_layers = concatenate_skips(enc_app_layers, enc_tg_layers, warp, image_size)
+        enc_layers = concatenate_skips(enc_app_layers, enc_tg_layers, warp, image_size, warp_agg)
     else:
         enc_layers = encoder([input_img] + input_pose + [output_pose], nfilters_encoder)
 
@@ -114,7 +114,7 @@ def make_generator(image_size, use_input_pose, warp_skip, disc_type):
                  outputs=[input_img] + input_pose + [out, output_pose] + warp_in_disc)
 
 
-def make_discriminator(image_size, use_input_pose, warp_skip, disc_type):
+def make_discriminator(image_size, use_input_pose, warp_skip, disc_type, warp_agg):
     input_img = Input(list(image_size) + [3])
     output_pose = Input(list(image_size) + [18])
     input_pose = Input(list(image_size) + [18])
@@ -163,7 +163,7 @@ def make_discriminator(image_size, use_input_pose, warp_skip, disc_type):
         out_inp = Concatenate(axis=-1)([input_img] + input_pose)
         out_inp = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out_inp)        
         
-        out_inp = AffineTransformLayer(10, 'max', image_size) ([out_inp] + warp)
+        out_inp = AffineTransformLayer(10, warp_agg, image_size) ([out_inp] + warp)
         
         out = Concatenate(axis=-1)([output_img, output_pose])
         out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)

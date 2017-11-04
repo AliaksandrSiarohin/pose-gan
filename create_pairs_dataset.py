@@ -35,6 +35,7 @@ if __name__ == "__main__":
     df = filter_not_valid(df_keypoints)
     print ('Compute pair dataset for train...')
     pairs_df_train = make_pairs(df)
+    print ('Number of pairs: %s' % len(pairs_df_train))
     pairs_df_train.to_csv(args.pairs_file_train, index=False)
 
     print ('Compute pair dataset for test...')
@@ -42,4 +43,5 @@ if __name__ == "__main__":
     df = filter_not_valid(df_keypoints)
     pairs_df_test = make_pairs(df)
     pairs_df_test = pairs_df_test.sample(n=min(args.images_for_test, pairs_df_test.shape[0]), replace=False, random_state=0)
+    print ('Number of pairs: %s' % len(pairs_df_test))
     pairs_df_test.to_csv(args.pairs_file_test, index=False)
