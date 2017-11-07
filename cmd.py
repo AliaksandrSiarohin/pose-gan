@@ -17,16 +17,16 @@ def args():
     parser.add_argument('--tv_penalty_weight', default=0, type=float, help='Weight of total variation loss')
     
     
-    parser.add_argument("--number_of_epochs", default=200, type=int, help="Number of training epochs")
+    parser.add_argument("--number_of_epochs", default=500, type=int, help="Number of training epochs")
 
     parser.add_argument("--content_loss_layer", default='none', help='Name of content layer (vgg19)'
                                                                      ' e.g. block4_conv1 or none')
 
     parser.add_argument("--checkpoints_dir", default="output/checkpoints", help="Folder with checkpoints")
-    parser.add_argument("--checkpoint_ratio", default=10, type=int, help="Number of epochs between consecutive checkpoints")
+    parser.add_argument("--checkpoint_ratio", default=30, type=int, help="Number of epochs between consecutive checkpoints")
     parser.add_argument("--generator_checkpoint", default=None, help="Previosly saved model of generator")
     parser.add_argument("--discriminator_checkpoint", default=None, help="Previosly saved model of discriminator")
-
+    parser.add_argument("--use_nn_loss", default=0, type=int, help="Use nearest neighbour loss")
 
     parser.add_argument('--dataset', default='market', choices=['market', 'fasion', 'fasion128'],
                         help='Market or fasion')

@@ -4,6 +4,7 @@ from keras.layers.convolutional import Conv2D, Conv2DTranspose, ZeroPadding2D, C
 from keras_contrib.layers.normalization import InstanceNormalization
 from keras.layers.advanced_activations import LeakyReLU
 import keras.backend as K
+from keras.backend import tf as ktf
 
 from gan.gan import GAN
 from gan.layer_utils import content_features_model
@@ -191,9 +192,32 @@ def total_variation_loss(x, image_size):
     return K.sum(K.pow(a + b, 1.25))
 
 
+def nn_loss(target, reference, neighborhood_size=(3, 3)):
+    v_pad = neighborhood_size[0] / 2
+    h_pad = neighborhood_size[1] / 2
+    val_pad = ktf.pad(reference, [[0, 0], [v_pad, v_pad], [h_pad, h_pad], [0, 0]],
+                      mode='CONSTANT', constant_values=-10000)
+    reference_tensors = []
+    for i_begin in range(0, neighborhood_size[0]):
+        i_end = i_begin - neighborhood_size[0] + 1
+        i_end = None if i_end == 0 else i_end
+        for j_begin in range(0, neighborhood_size[1]):
+            j_end = j_begin - neighborhood_size[0] + 1
+            j_end = None if j_end == 0 else j_end
+            sub_tensor = val_pad[:, i_begin:i_end, j_begin:j_end, :]
+            reference_tensors.append(ktf.expand_dims(sub_tensor, -1))
+    reference = ktf.concat(reference_tensors, axis=-1)
+    target = ktf.expand_dims(target, axis=-1)
+
+    abs = ktf.abs(reference - target)
+    norms = ktf.reduce_sum(abs, reduction_indices=[-2])
+    loss = ktf.reduce_min(norms, reduction_indices=[-1])
+
+    return loss
+
 class CGAN(GAN):
     def __init__(self, generator, discriminator, l1_penalty_weight, gan_penalty_weight, use_input_pose, image_size,
-                 content_loss_layer, tv_penalty_weight, **kwargs):
+                 content_loss_layer, tv_penalty_weight, use_nn_loss, **kwargs):
         super(CGAN, self).__init__(generator, discriminator, generator_optimizer=Adam(2e-4, 0.5, 0.999),
                                     discriminator_optimizer=Adam(2e-4, 0.5, 0.999), **kwargs)
         generator.summary()
@@ -204,10 +228,16 @@ class CGAN(GAN):
         self._content_loss_layer = content_loss_layer
         self._gan_penalty_weight = gan_penalty_weight
         self._tv_penalty_weight = tv_penalty_weight
+        self._use_nn_loss = use_nn_loss
 
     def _compile_generator_loss(self):
         image_index = 2 if self._use_input_pose else 1
         
+        def st_loss(a, b):
+            if self._use_nn_loss:
+                return nn_loss(a, b, (5, 5))
+            else:                    
+                return K.mean(K.abs(a - b))
         
         if self._content_loss_layer != 'none':
             layer_name = self._content_loss_layer.split(',')
@@ -219,11 +249,11 @@ class CGAN(GAN):
                 reference = [reference]
                 target = [target]
             for a, b in zip(reference, target):
-                l1_loss = l1_loss + self._l1_penalty_weight * K.mean(K.abs(a - b))
+                l1_loss = l1_loss + self._l1_penalty_weight * st_loss(a, b)
         else:
             reference = self._generator_input[image_index]
             target = self._discriminator_fake_input[image_index]
-            l1_loss = self._l1_penalty_weight * K.mean(K.abs(reference - target))
+            l1_loss = self._l1_penalty_weight * st_loss(reference, target)
         
         def tv_loss(y_true, y_pred):
             return self._tv_penalty_weight * total_variation_loss(self._discriminator_fake_input[image_index], self._image_size)
