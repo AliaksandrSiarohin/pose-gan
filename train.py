@@ -17,7 +17,8 @@ def main():
         discriminator.load_weights(args.discriminator_checkpoint)
     
     dataset = PoseHMDataset(args.images_dir_train, args.batch_size, args.image_size, args.pairs_file_train,
-                            args.annotations_file_train, args.use_input_pose, args.warp_skip, args.disc_type, args.tmp_pose_dir)
+                            args.annotations_file_train, args.use_input_pose, args.warp_skip, args.disc_type, args.tmp_pose_dir,
+                            args.use_validation)
     
     gan = CGAN(generator, discriminator,   **vars(args))
     trainer = Trainer(dataset, gan, **vars(args))

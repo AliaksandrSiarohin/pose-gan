@@ -58,7 +58,8 @@ def test():
     generator.load_weights(args.generator_checkpoint)
 
     dataset = PoseHMDataset(args.images_dir_test, 1, args.image_size, args.pairs_file_test,
-                            args.annotations_file_test, args.use_input_pose, args.warp_skip, args.disc_type, args.tmp_pose_dir, shuffle=False)
+                            args.annotations_file_test, args.use_input_pose, args.warp_skip, args.disc_type, args.tmp_pose_dir,
+                            use_validation=0, shuffle=False)
 
     pairs_df = dataset._pairs_file
     print ("Generate images...")

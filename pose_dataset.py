@@ -13,12 +13,16 @@ import os
 
 class PoseHMDataset(UGANDataset):
     def __init__(self, images_dir, batch_size, image_size, pairs_file, annotations_file,
-                 use_input_pose, warp_skip, disc_type, tmp_pose_dir, shuffle=True):
+                 use_input_pose, warp_skip, disc_type, tmp_pose_dir, use_validation, shuffle=True, **kwargs):
         super(PoseHMDataset, self).__init__(batch_size, None)
         self._batch_size = batch_size
         self._image_size = image_size
         self._images_dir = images_dir
         self._pairs_file = pd.read_csv(pairs_file)
+        self._use_validation = use_validation
+        if self._use_validation:
+            self.validation_split()
+
         self._annotations_file = pd.read_csv(annotations_file, sep=':')
         self._annotations_file = self._annotations_file.set_index('name')
         self._use_input_pose = use_input_pose
@@ -29,13 +33,31 @@ class PoseHMDataset(UGANDataset):
         if not os.path.exists(self._tmp_pose):
             os.makedirs(self._tmp_pose) 
         print ("Number of images: %s" % len(self._annotations_file))
-        print ("Number of pairs: %s" % len(self._pairs_file))
+        print ("Number of pairs train: %s" % len(self._pairs_file))
+        if self._use_validation:
+            print ("Number of pairs val: %s" % len(self._pairs_file_val))
 
         self._batches_before_shuffle = int(self._annotations_file.shape[0] // self._batch_size)
 
     def number_of_batches_per_epoch(self):
         return 1000#self._annotations_file.shape[0] // self._batch_size
-       
+
+    def number_of_batches_per_validation(self):
+        return 100
+
+    def validation_split(self):
+        np.random.seed(0)
+        img_names = self._pairs_file['from']
+        ids = img_names.apply(lambda img: img.split('_')[0])
+        unique_ids = pd.unique(ids)
+        val_ids = set(np.random.choice(unique_ids, size=int(0.1 * len(unique_ids)), replace=False))
+
+        val_mask = ids.isin(val_ids)
+        train_pairs = self._pairs_file[np.logical_not(val_mask)]
+        val_pairs = self._pairs_file[val_mask]
+
+        self._pairs_file_val = val_pairs
+        self._pairs_file = train_pairs
 
     def compute_pose_map_batch(self, pair_df, direction):
         assert direction in ['to', 'from']
@@ -88,8 +110,11 @@ class PoseHMDataset(UGANDataset):
             i += 1
         return self._preprocess_image(batch)
 
-    def load_batch(self, index, for_discriminator):
-        pair_df = self._pairs_file.iloc[index]
+    def load_batch(self, index, for_discriminator, validation=False):
+        if validation:
+            pair_df = self._pairs_file_val.iloc[index]
+        else:
+            pair_df = self._pairs_file.iloc[index]
         result = [self.load_image_batch(pair_df, 'from')]
         if self._use_input_pose:
             result.append(self.compute_pose_map_batch(pair_df, 'from'))
@@ -103,6 +128,10 @@ class PoseHMDataset(UGANDataset):
     def next_generator_sample(self):
         index = self._next_data_index()
         return self.load_batch(index, False)
+
+    def next_generator_sample_validation(self):
+        index = np.random.choice(len(self._pairs_file_val), size=self._batch_size)
+        return self.load_batch(index, False, True)
 
     def next_discriminator_sample(self):
         index = self._next_data_index()
