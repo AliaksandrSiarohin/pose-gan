@@ -17,10 +17,9 @@ def l1_score(pairs_df, generated_images, images_folder):
     score_list = []
     for df_row, generated_image in zip(pairs_df.iterrows(), generated_images):
         reference_image = imread(os.path.join(images_folder, df_row[1]['to']))
-        score = np.abs(reference_image - generated_image).mean()
-        score_list.append(score / 255.0)
+        score = np.abs(2 * (reference_image/255.0 - 0.5) - 2 * (generated_image/255.0 - 0.5)).mean()
+        score_list.append(score)
     return np.mean(score_list)
-
 def ssim_score(pairs_df, generated_images, images_folder):
     ssim_score_list = []
     for df_row, generated_image in zip(pairs_df.iterrows(), generated_images):
