@@ -192,7 +192,7 @@ def total_variation_loss(x, image_size):
     return K.sum(K.pow(a + b, 1.25))
 
 
-def nn_loss(target, reference, neighborhood_size=(3, 3)):
+def nn_loss(reference, target, neighborhood_size=(3, 3)):
     v_pad = neighborhood_size[0] / 2
     h_pad = neighborhood_size[1] / 2
     val_pad = ktf.pad(reference, [[0, 0], [v_pad, v_pad], [h_pad, h_pad], [0, 0]],
@@ -217,7 +217,7 @@ def nn_loss(target, reference, neighborhood_size=(3, 3)):
 
 class CGAN(GAN):
     def __init__(self, generator, discriminator, l1_penalty_weight, gan_penalty_weight, use_input_pose, image_size,
-                 content_loss_layer, tv_penalty_weight, use_nn_loss, **kwargs):
+                 content_loss_layer, tv_penalty_weight, nn_loss_area_size, **kwargs):
         super(CGAN, self).__init__(generator, discriminator, generator_optimizer=Adam(2e-4, 0.5, 0.999),
                                     discriminator_optimizer=Adam(2e-4, 0.5, 0.999), **kwargs)
         generator.summary()
@@ -228,14 +228,14 @@ class CGAN(GAN):
         self._content_loss_layer = content_loss_layer
         self._gan_penalty_weight = gan_penalty_weight
         self._tv_penalty_weight = tv_penalty_weight
-        self._use_nn_loss = use_nn_loss
+        self._nn_loss_area_size = nn_loss_area_size
 
     def _compile_generator_loss(self):
         image_index = 2 if self._use_input_pose else 1
         
         def st_loss(a, b):
-            if self._use_nn_loss:
-                return nn_loss(a, b, (5, 5))
+            if self._nn_loss_area_size > 1:
+                return nn_loss(a, b, (self._nn_loss_area_size, self._nn_loss_area_size))
             else:                    
                 return K.mean(K.abs(a - b))
         
