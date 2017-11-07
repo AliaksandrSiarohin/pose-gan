@@ -20,7 +20,7 @@ def main():
                             args.annotations_file_train, args.use_input_pose, args.warp_skip, args.disc_type, args.tmp_pose_dir,
                             args.use_validation)
     
-    gan = CGAN(generator, discriminator,   **vars(args))
+    gan = CGAN(generator, discriminator, **vars(args))
     trainer = Trainer(dataset, gan, **vars(args))
     
     trainer.train()
