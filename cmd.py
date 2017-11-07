@@ -27,6 +27,7 @@ def args():
     parser.add_argument("--generator_checkpoint", default=None, help="Previosly saved model of generator")
     parser.add_argument("--discriminator_checkpoint", default=None, help="Previosly saved model of discriminator")
     parser.add_argument("--nn_loss_area_size", default=1, type=int, help="Use nearest neighbour loss")
+    parser.add_argument("--use_validation", default=1, type=int, help="Use validation")
 
     parser.add_argument('--dataset', default='market', choices=['market', 'fasion', 'fasion128'],
                         help='Market or fasion')
