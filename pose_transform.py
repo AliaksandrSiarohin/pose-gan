@@ -220,110 +220,162 @@ def affine_transforms(array1, array2):
     return np.array(transforms).reshape((-1, 9))[..., :-1]
 
 
+def estimate_uniform_transform(array1, array2):
+    kp1 = give_name_to_keypoints(array1)
+    kp2 = give_name_to_keypoints(array2)
+
+    no_point_tr = np.array([[1, 0, 1000], [0, 1, 1000], [0, 0, 1]])
+
+    def check_invertible(tr):
+        return np.linalg.cond(tr) < 10000
+
+    keypoint_names = {'Rhip', 'Lhip', 'Lsho', 'Rsho'}
+    candidate_names = {'Rkne', 'Lkne'}
+
+    for cn in candidate_names:
+        if cn in kp1 and cn in kp2:
+            keypoint_names.add(cn)
+
+    poly_1 = get_array_of_points(kp1, list(keypoint_names))
+    poly_2 = get_array_of_points(kp2, list(keypoint_names))
+
+    tr = skimage.transform.estimate_transform('affine', src=poly_2, dst=poly_1)
+
+    tr = tr.params
+
+    if check_invertible(tr):
+        return tr.reshape((-1, 9))[..., :-1]
+    else:
+        return no_point_tr.reshape((-1, 9))[..., :-1]
+
+
 if __name__ == "__main__":
-    from skimage import data
-    from skimage.transform import resize
-    from scipy.ndimage import map_coordinates
+    import pandas as pd
+    import os
+    pairs_df = pd.read_csv('data/market-pairs-train.csv')
+    kp_df = pd.read_csv('data/market-annotation-train.csv', sep=':')
+    img_folder = 'data/market-dataset/train'
+    for _, row in pairs_df.iterrows():
+        fr = row['from']
+        to = row['to']
+        fr_img = imread(os.path.join(img_folder, fr))
+        to_img = imread(os.path.join(img_folder, to))
 
-    def shift_up10_left20(xy):
-        return xy - np.array([-20, 10])[None, :]
+        kp_fr = kp_df[kp_df['name'] == fr].iloc[0]
+        kp_to = kp_df[kp_df['name'] == to].iloc[0]
 
-    image = data.astronaut().astype(np.float32)
-    coords = warp_coords(shift_up10_left20, image.shape)
-    print (coords.shape)
-    warped_image = map_coordinates(image, coords)
-
-
-    second = ['data/market-dataset/train_1/0048_c5s1_005251_02.jpg',
-             '[30, 32, 19, 13, 14, 45, 53, 49, 26, 29, 30, 42, 43, 41, 28, 32, 25, 37]',
-             '[40, 49, 49, 61, 69, 49, 63, 65, 75, 96, 114, 74, 97, 117, 38, 38, 39, 38]']
-    first = ['data/market-dataset/train_1/0048_c5s1_005301_02.jpg',
-              '[25, 31, 12, 8, 14, 47, 55, -1, 26, 30, 34, 45, 46, 43, 22, 28, -1, 36]',
-              '[15, 26, 28, 46, 65, 26, 42, -1, 62, 89, 114, 60, 86, 113, 12, 12, -1, 12]']
-    first2 = ["data/market-dataset/train_1/0002_c1s1_000776_01.jpg", "[24, 28, 12, -1, -1, 45, 45, 29, 15, 6, -1, 37, 43, 47, 21, 27, -1, 35]",
-             "[13, 27, 27, -1, -1, 27, 47, 58, 67, 96, -1, 68, 94, 118, 11, 10, -1, 12]"]
-    second2 = ["data/market-dataset/train_1/0002_c1s1_000801_01.jpg", "[24, 32, 17, 16, -1, 47, 46, 27, 22, 16, 8, 42, 49, 59, 22, 27, -1, 35]",
-                                          "[14, 25, 26, 44, -1, 24, 41, 46, 66, 92, 123, 65, 90, 111, 11, 11, -1, 11]"]
-
-    # first = ['0010_c1s6_027296_01.jpg', "[41, 24, 31, 38, 55, 16, -1, -1, 31, 44, 30, 19, 40, 10, 39, -1, 31, -1]",
-    #          "[10, 21, 22, 37, 45, 21, -1, -1, 58, 88, 119, 59, 87, 110, 7, -1, 8, -1]"]
-
-    def get(first, second):
         plt.subplot(3, 1, 1)
-        a = first
-        img = imread(a[0])
-        image = img.copy()
-        array1 = pose_utils.load_pose_cords_from_strings(a[2], a[1])
-        print (img.shape)
-        p, m = pose_utils.draw_pose_from_cords(array1, img.shape[:2])
+        kp_fr = pose_utils.load_pose_cords_from_strings(kp_fr['keypoints_y'], kp_fr['keypoints_x'])
+        kp_to = pose_utils.load_pose_cords_from_strings(kp_to['keypoints_y'], kp_to['keypoints_x'])
+
+        img = fr_img.copy()
+        p, m = pose_utils.draw_pose_from_cords(kp_fr, img.shape[:2])
         img[m] = p[m]
         plt.imshow(img)
 
         plt.subplot(3, 1, 2)
-        a = second
-        img = imread(a[0])
-        array2 = pose_utils.load_pose_cords_from_strings(a[2], a[1])
-        p, m = pose_utils.draw_pose_from_cords(array2, img.shape[:2])
+        img = to_img.copy()
+        p, m = pose_utils.draw_pose_from_cords(kp_to, img.shape[:2])
         img[m] = p[m]
         plt.imshow(img)
-        pose_utils.draw_legend()
-        trs = affine_transforms(array1, array2)
-        masks = pose_masks(array2, (128, 64))
-
-        image = resize(image, (64, 32), preserve_range=True)
-        m = resize(m, (64, 32), preserve_range=True, order=0).astype(bool)
-        p = resize(p, (64, 32), preserve_range=True, order=0)
-        return trs, masks, image, p,  m
 
 
-    trs, masks, img, p, m = get(first2, second2)
-    trs2, masks2, img2, p2, m2 = get(first, second)
+        tr = estimate_uniform_transform(kp_fr, kp_to)
 
-    plt.subplot(3, 1, 3)
+        x = Input(fr_img.shape)
+        i = Input((1, 8))
 
-    x_v = np.concatenate([img[np.newaxis], img2[np.newaxis]])
-    i_v = np.concatenate([trs[np.newaxis], trs2[np.newaxis]])
-    m_v = np.concatenate([masks[np.newaxis], masks2[np.newaxis]])
+        y = AffineTransformLayer(1, 'max', (128, 64))([x, i])
+        model = Model(inputs=[x, i], outputs=y)
 
-    #trs = CordinatesWarp.affine_transforms(array1, array2)
-    x = Input((64,32,3))
-    i = Input((len(trs), 8))
-    masks = Input((len(trs), 128, 64))
+        b = model.predict([fr_img[np.newaxis], tr[np.newaxis]])
+        print (b.shape)
+        plt.subplot(3, 1, 3)
 
-    y = AffineTransformLayer(len(trs), 'max', (128, 64))([x, i])
-    model = Model(inputs=[x, i, masks], outputs=y)
+        a = b[0].copy().astype('uint8')
+        a[m] = p[m]
+        plt.imshow(a)
 
-    # x_v = skimage.transform.resize(image, (128, 64), preserve_range=True)[np.newaxis]
-    # i_v = trs[np.newaxis]
-
-    b = model.predict([x_v, i_v, m_v])
-    print (b.shape)
-    b = b[..., :3]
+        plt.show()
 
 
-    # trs, _ = CordinatesWarp.warp_mask(array1, array2, img_size=img.shape[:2])
-    # x = Input((128,64,3))
-    # i = Input((128,64,2))
+
+    # def get(first, second):
+    #     plt.subplot(3, 1, 1)
+    #     a = first
+    #     img = imread(a[0])
+    #     image = img.copy()
+    #     array1 = pose_utils.load_pose_cords_from_strings(a[2], a[1])
+    #     print (img.shape)
+    #     p, m = pose_utils.draw_pose_from_cords(array1, img.shape[:2])
+    #     img[m] = p[m]
+    #     plt.imshow(img)
     #
-    # y = WarpLayer(1)([x, i])
-    # model = Model(inputs=[x, i], outputs=y)
+    #     plt.subplot(3, 1, 2)
+    #     a = second
+    #     img = imread(a[0])
+    #     array2 = pose_utils.load_pose_cords_from_strings(a[2], a[1])
+    #     p, m = pose_utils.draw_pose_from_cords(array2, img.shape[:2])
+    #     img[m] = p[m]
+    #     plt.imshow(img)
+    #     pose_utils.draw_legend()
+    #     trs = affine_transforms(array1, array2)
+    #     masks = pose_masks(array2, (128, 64))
     #
-    # x_v = skimage.transform.resize(image, (128, 64), preserve_range=True)[np.newaxis]
-    # i_v = trs[np.newaxis]
+    #     image = resize(image, (64, 32), preserve_range=True)
+    #     m = resize(m, (64, 32), preserve_range=True, order=0).astype(bool)
+    #     p = resize(p, (64, 32), preserve_range=True, order=0)
+    #     return trs, masks, image, p,  m
     #
-    # b = model.predict([x_v, i_v])
+    #
+    # trs, masks, img, p, m = get(first2, second2)
+    # trs2, masks2, img2, p2, m2 = get(first, second)
+    #
+    # plt.subplot(3, 1, 3)
+    #
+    # x_v = np.concatenate([img[np.newaxis], img2[np.newaxis]])
+    # i_v = np.concatenate([trs[np.newaxis], trs2[np.newaxis]])
+    # m_v = np.concatenate([masks[np.newaxis], masks2[np.newaxis]])
+    #
+    # #trs = CordinatesWarp.affine_transforms(array1, array2)
+    # x = Input((64,32,3))
+    # i = Input((len(trs), 8))
+    # masks = Input((len(trs), 128, 64))
+    #
+    # y = AffineTransformLayer(len(trs), 'max', (128, 64))([x, i])
+    # model = Model(inputs=[x, i, masks], outputs=y)
+    #
+    # # x_v = skimage.transform.resize(image, (128, 64), preserve_range=True)[np.newaxis]
+    # # i_v = trs[np.newaxis]
+    #
+    # b = model.predict([x_v, i_v, m_v])
     # print (b.shape)
-
-    warped_image = np.squeeze(b[1]).astype(np.uint8)
-    warped_image[m2] = p2[m2]
-    plt.imshow(warped_image)
-
-    # from scipy.ndimage import map_coordinates
+    # b = b[..., :3]
     #
-    # mask = CordinatesWarp.warp_mask(array1, array2, (128, 64, 3))
-    # mask = np.moveaxis(mask, -1, 0)
-    # warped_image = map_coordinates(image, mask)
-    # warped_image[m] = p[m]
-    # plt.subplot(4, 1, 4)
+    #
+    # # trs, _ = CordinatesWarp.warp_mask(array1, array2, img_size=img.shape[:2])
+    # # x = Input((128,64,3))
+    # # i = Input((128,64,2))
+    # #
+    # # y = WarpLayer(1)([x, i])
+    # # model = Model(inputs=[x, i], outputs=y)
+    # #
+    # # x_v = skimage.transform.resize(image, (128, 64), preserve_range=True)[np.newaxis]
+    # # i_v = trs[np.newaxis]
+    # #
+    # # b = model.predict([x_v, i_v])
+    # # print (b.shape)
+    #
+    # warped_image = np.squeeze(b[1]).astype(np.uint8)
+    # warped_image[m2] = p2[m2]
     # plt.imshow(warped_image)
-    plt.show()
+    #
+    # # from scipy.ndimage import map_coordinates
+    # #
+    # # mask = CordinatesWarp.warp_mask(array1, array2, (128, 64, 3))
+    # # mask = np.moveaxis(mask, -1, 0)
+    # # warped_image = map_coordinates(image, mask)
+    # # warped_image[m] = p[m]
+    # # plt.subplot(4, 1, 4)
+    # # plt.imshow(warped_image)
+    # plt.show()
