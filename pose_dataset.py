@@ -40,10 +40,10 @@ class PoseHMDataset(UGANDataset):
         self._batches_before_shuffle = int(self._annotations_file.shape[0] // self._batch_size)
 
     def number_of_batches_per_epoch(self):
-        return 1000#self._annotations_file.shape[0] // self._batch_size
+        return 1000
 
     def number_of_batches_per_validation(self):
-        return 100
+        return len(self._pairs_file_val) // self._batch_size
 
     def validation_split(self):
         np.random.seed(0)
