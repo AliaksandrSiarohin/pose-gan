@@ -66,11 +66,11 @@ def decoder(skips, nfilters=(512, 512, 512, 256, 128, 3)):
     out = Activation('tanh')(out)
     return out
 
-def concatenate_skips(skips_app, skips_pose, warp, image_size, warp_agg):
+def concatenate_skips(skips_app, skips_pose, warp, image_size, warp_agg, warp_skip):
     skips = []
     for i, (sk_app, sk_pose) in enumerate(zip(skips_app, skips_pose)):
         if i < 4:
-            out = AffineTransformLayer(10, warp_agg, image_size) ([sk_app] + warp)
+            out = AffineTransformLayer(10 if warp_skip == 'mask' else 1, warp_agg, image_size)([sk_app] + warp)
             out = Concatenate(axis=-1)([out, sk_pose])
         else:
             out = Concatenate(axis=-1)([sk_app, sk_pose])
@@ -89,7 +89,7 @@ def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg):
     nfilters_encoder = (64, 128, 256, 512, 512, 512) if max(image_size) == 128 else (64, 128, 256, 512, 512, 512, 512)
 
     if warp_skip == 'full':
-        warp = [Input((10, 8))]
+        warp = [Input((1, 8))]
     elif warp_skip == 'mask':
         warp = [Input((10, 8)), Input((10, image_size[0], image_size[1]))]
     else:
@@ -103,7 +103,7 @@ def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg):
     if use_warp_skip:
         enc_app_layers = encoder([input_img] + input_pose, nfilters_encoder)
         enc_tg_layers = encoder([output_pose], nfilters_encoder)
-        enc_layers = concatenate_skips(enc_app_layers, enc_tg_layers, warp, image_size, warp_agg)
+        enc_layers = concatenate_skips(enc_app_layers, enc_tg_layers, warp, image_size, warp_agg, warp_skip)
     else:
         enc_layers = encoder([input_img] + input_pose + [output_pose], nfilters_encoder)
 

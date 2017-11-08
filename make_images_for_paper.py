@@ -54,4 +54,14 @@ for n, img_pair in enumerate(os.listdir(in_folder)):
 
     imsave(os.path.join(cur_folder, 'gen.jpg'), gen_img)
 
+    hm_from = pose_utils.cords_to_map(kp_fr, args.image_size).sum(axis=-1)
+    hm_to = pose_utils.cords_to_map(kp_to, args.image_size).sum(axis=-1)
+
+    hm_from /= hm_from.max()
+    hm_to /= hm_to.max()
+
+    imsave(os.path.join(cur_folder, 'hm_from.jpg'), hm_from)
+
+    imsave(os.path.join(cur_folder, 'hm_to.jpg'), hm_to)
+
 

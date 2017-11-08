@@ -27,6 +27,7 @@ class AffineTransformLayer(Layer):
 
     def build(self, input_shape):
         self.image_size = list(input_shape[0][1:])
+        print (self.image_size)
         self.affine_mul = [1, 1, self.init_image_size[0] / self.image_size[0],
                            1, 1, self.init_image_size[1] / self.image_size[1],
                            1, 1]
@@ -252,6 +253,7 @@ def estimate_uniform_transform(array1, array2):
 if __name__ == "__main__":
     import pandas as pd
     import os
+    from skimage.transform import resize
     pairs_df = pd.read_csv('data/market-pairs-train.csv')
     kp_df = pd.read_csv('data/market-annotation-train.csv', sep=':')
     img_folder = 'data/market-dataset/train'
@@ -279,6 +281,9 @@ if __name__ == "__main__":
         img[m] = p[m]
         plt.imshow(img)
 
+        p = resize(p, (64, 32), preserve_range=True).astype(np.uint8)
+        m = resize(m, (64, 32), preserve_range=True).astype(bool)
+        fr_img = resize(fr_img, (64, 32), preserve_range=True).astype(float)
 
         tr = estimate_uniform_transform(kp_fr, kp_to)
 
@@ -289,7 +294,6 @@ if __name__ == "__main__":
         model = Model(inputs=[x, i], outputs=y)
 
         b = model.predict([fr_img[np.newaxis], tr[np.newaxis]])
-        print (b.shape)
         plt.subplot(3, 1, 3)
 
         a = b[0].copy().astype('uint8')

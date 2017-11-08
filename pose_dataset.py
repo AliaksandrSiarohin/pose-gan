@@ -77,9 +77,11 @@ class PoseHMDataset(UGANDataset):
         return batch
 
     def compute_cord_warp_batch(self, pair_df):
-        batch = [np.empty([self._batch_size] + [10, 8])]
-        if self._warp_skip == 'mask':
-            batch.append(np.empty([self._batch_size, 10] + list(self._image_size)))
+        if self._warp_skip == 'full':
+            batch = [np.empty([self._batch_size] + [1, 8])]
+        else:
+            batch = [np.empty([self._batch_size] + [10, 8]),
+                     np.empty([self._batch_size, 10] + list(self._image_size))]
         i = 0
         for _, p in pair_df.iterrows():
             fr = self._annotations_file.loc[p['from']]
@@ -88,10 +90,11 @@ class PoseHMDataset(UGANDataset):
                                                                 fr['keypoints_x'])
             kp_array2 = pose_utils.load_pose_cords_from_strings(to['keypoints_y'],
                                                                 to['keypoints_x'])
-
-            batch[0][i] = pose_transform.affine_transforms(kp_array1, kp_array2)
             if self._warp_skip == 'mask':
+                batch[0][i] = pose_transform.affine_transforms(kp_array1, kp_array2)
                 batch[1][i] = pose_transform.pose_masks(kp_array2, self._image_size)
+            else:
+                batch[0][i] = pose_transform.estimate_uniform_transform(kp_array1, kp_array2)
             i += 1
         return batch
 
