@@ -4,7 +4,7 @@ import caffe
 caffe.set_device(0)
 caffe.set_mode_gpu()
 from skimage import img_as_float
-import os
+from tqdm import tqdm
 
 class SSDScorer(object):
     def __init__(self, model_def='deploy.prototxt', model_weights='VGG_VOC0712_SSD_300x300_iter_120000.caffemodel'):
@@ -37,19 +37,31 @@ class SSDScorer(object):
     def get_score_image_set(self, imgs, image_class=15):
         #image_class=15 Only persons
         scores = []
-        for img in imgs:
+        for img in tqdm(imgs):
             scores.append(self.get_score(img, image_class))
         return np.mean(scores)
 
 if __name__ == "__main__":
     from skimage.io import imread
+    import os
+    from argparse import ArgumentParser
 
-    import pandas as pd
-    df = pd.read_csv('../data/market-pairs-test.csv')['to']
+    split = lambda s: tuple(s.split(','))
+    parser = ArgumentParser(description="Computing ssd_score")
+    parser.add_argument("--image_size", default=(128,64), type=split, help='Image size')
+    parser.add_argument("--input_dir", default='../output/generated_images', help='Folder with images')
+    parser.add_argument("--img_index", default=0, type=int,  help='Index of image generated image '
+                                                                  'for results with multiple images')
+    args = parser.parse_args()
 
     imgs = []
-    for name in df:
-        imgs.append(imread(os.path.join('../data/market-dataset/test', name)))
+    for name in os.listdir(args.input_dir):
+        img = imread(os.path.join(args.input_dir, name))
+        img = img[:, args.img_index * args.image_size[1]:(args.img_index + 1) * args.image_size[1]]
+        imgs.append(img)
 
+        # import pylab as plt
+        # plt.imshow(img)
+        # plt.show()
     sc = SSDScorer()
     print (sc.get_score_image_set(imgs))
