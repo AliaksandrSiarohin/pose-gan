@@ -1,11 +1,11 @@
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
-from skimage.draw import circle, line_aa
+from skimage.draw import circle, line_aa, polygon
 import json
 
 import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+# matplotlib.use('Agg')
+# import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from collections import defaultdict
 import skimage.measure, skimage.transform
@@ -105,6 +105,39 @@ def draw_legend():
     handles = [mpatches.Patch(color=np.array(color) / 255.0, label=name) for color, name in zip(COLORS, LABELS)]
     plt.legend(handles=handles, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
+def produce_ma_mask(kp_array, img_size, point_radius=4):
+    from scipy.ndimage.morphology import binary_fill_holes
+    mask = np.zeros(shape=img_size, dtype=bool)
+    limbs = LIMB_SEQ + [[2, 8], [5, 11], [11, 8], [2, 5], [14, 15], [14, 16], [14, 17], [15, 16], [15, 17], [16, 17]]
+
+    for f, t in limbs:
+        from_missing = kp_array[f][0] == MISSING_VALUE or kp_array[f][1] == MISSING_VALUE
+        to_missing = kp_array[t][0] == MISSING_VALUE or kp_array[t][1] == MISSING_VALUE
+        if from_missing or to_missing:
+            continue
+
+        norm_vec = kp_array[f] - kp_array[t]
+        norm_vec = np.array([-norm_vec[1], norm_vec[0]])
+        norm_vec = point_radius * norm_vec / np.linalg.norm(norm_vec)
+
+
+        vetexes = np.array([
+            kp_array[f] + norm_vec,
+            kp_array[f] - norm_vec,
+            kp_array[t] - norm_vec,
+            kp_array[t] + norm_vec
+        ])
+        yy, xx = polygon(vetexes[:, 0], vetexes[:, 1], shape=img_size)
+        mask[yy, xx] = True
+
+    for i, joint in enumerate(kp_array):
+        if kp_array[i][0] == MISSING_VALUE or kp_array[i][1] == MISSING_VALUE:
+            continue
+        yy, xx = circle(joint[0], joint[1], radius=point_radius, shape=img_size)
+        mask[yy, xx] = True
+
+    return binary_fill_holes(mask)
+
 if __name__ == "__main__":
     import pandas as pd
     from skimage.io import imread
@@ -117,9 +150,14 @@ if __name__ == "__main__":
         pose_cords = load_pose_cords_from_strings(row['keypoints_y'], row['keypoints_x'])
 
         colors, mask = draw_pose_from_cords(pose_cords, (128, 64))
+
+        mmm = produce_ma_mask(pose_cords, (128, 64)).astype(float)[..., np.newaxis].repeat(3, axis=-1)
+        print mmm.shape
         img = imread('data/market-dataset/train/' + row['name'])
 
-        img[mask] = colors[mask]
+        mmm[mask] = colors[mask]
+
+        print (mmm)
         plt.subplot(1, 1, 1)
-        plt.imshow(img)
+        plt.imshow(mmm)
         plt.show()

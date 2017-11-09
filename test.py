@@ -11,19 +11,20 @@ from skimage.io import imread, imsave
 from skimage.measure import compare_ssim
 
 import numpy as np
+import pandas as pd
 
 
-def l1_score(pairs_df, generated_images, images_folder):
+def l1_score(generated_images, reference_images):
     score_list = []
-    for df_row, generated_image in zip(pairs_df.iterrows(), generated_images):
-        reference_image = imread(os.path.join(images_folder, df_row[1]['to']))
+    for reference_image, generated_image in zip(reference_images, generated_images):
         score = np.abs(2 * (reference_image/255.0 - 0.5) - 2 * (generated_image/255.0 - 0.5)).mean()
         score_list.append(score)
     return np.mean(score_list)
-def ssim_score(pairs_df, generated_images, images_folder):
+
+
+def ssim_score(generated_images, reference_images):
     ssim_score_list = []
-    for df_row, generated_image in zip(pairs_df.iterrows(), generated_images):
-        reference_image = imread(os.path.join(images_folder, df_row[1]['to']))
+    for reference_image, generated_image in zip(reference_images, generated_images):
         ssim = compare_ssim(reference_image, generated_image, gaussian_weights=True, sigma=1.5,
                             use_sample_covariance=False, multichannel=True,
                             data_range=generated_image.max() - generated_image.min())
@@ -49,6 +50,27 @@ def save_images(pairs_df, generated_images, images_folder, output_folder, img_sa
         imsave(os.path.join(output_folder, res_name), np.concatenate(images, axis=1))
 
 
+def create_masked_image(pairs_df, images, annotation_file):
+    import pose_utils
+    masked_images = []
+    df = pd.read_csv(annotation_file, sep=':')
+    for df_row, image in zip(pairs_df.iterrows(), images):
+        to = df_row[1]['to']
+        ano_to = df[df['name'] == to].iloc[0]
+
+        kp_to = pose_utils.load_pose_cords_from_strings(ano_to['keypoints_y'], ano_to['keypoints_x'])
+
+        mask = pose_utils.produce_ma_mask(kp_to, image.shape[:2])
+        masked_images.append(image * mask[..., np.newaxis])
+
+    return masked_images
+
+def load_reference_images(pairs_df, images_folder):
+    reference_images = []
+    for df_row in pairs_df.iterrows():
+        reference_images.append(imread(os.path.join(images_folder, df_row[1]['to'])))
+    return reference_images
+
 def test():
     args = cmd.args()
 
@@ -63,24 +85,36 @@ def test():
     pairs_df = dataset._pairs_file
     print ("Generate images...")
     generated_images = generate_images(dataset, generator, pairs_df.shape[0], out_index=-2)
+    reference_images = load_reference_images(pairs_df, args.images_dir_test)
 
     print ("Save images to %s..." % (args.generated_images_dir, ))
     save_images(pairs_df, generated_images, args.images_dir_test,
                 args.generated_images_dir, args.generated_images_save_format)
 
     print ("Compute inception score...")
-    inception_score = 0#get_inception_score(generated_images)
+    inception_score = get_inception_score(generated_images)
+    print ("Inception score %s" % inception_score[0])
 
     print ("Compute structured similarity score (SSIM)...")
-    structured_score = ssim_score(pairs_df, generated_images, args.images_dir_test)
+    structured_score = ssim_score(generated_images, reference_images)
+    print ("SSIM score %s" % structured_score)
 
     print ("Compute l1 score...")
-    norm_score = l1_score(pairs_df, generated_images, args.images_dir_test)
+    norm_score = l1_score(generated_images, reference_images)
+    print ("L1 score %s" % norm_score)
 
-    print ("Compute ssd score...")
+    print ("Compute masked inception score...")
+    generated_images_masked = create_masked_image(pairs_df, generated_images, args.annotations_file_test)
+    reference_images_masked = create_masked_image(pairs_df, reference_images, args.annotations_file_test)
+    inception_score_masked = get_inception_score(generated_images_masked)
 
-    print ("Inception score = %s, SSIM score = %s, l1 score = %s" %
-           (inception_score, structured_score, norm_score))
+    print ("Inception score masked %s" % inception_score_masked[0])
+    print ("Compute masked SSIM...")
+    structured_score_masked = ssim_score(generated_images_masked, reference_images_masked)
+    print ("SSIM score masked %s" % structured_score_masked)
+
+    print ("Inception score = %s, masked = %s; SSIM score = %s, masked = %s; l1 score = %s" %
+           (inception_score, inception_score_masked, structured_score, structured_score_masked, norm_score))
 
 
 
