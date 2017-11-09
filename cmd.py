@@ -15,8 +15,9 @@ def args():
     parser.add_argument("--l1_penalty_weight", default=100, type=float, help='Weight of l1 loss')
     parser.add_argument('--gan_penalty_weight', default=1, type=float, help='Weight of GAN loss')
     parser.add_argument('--tv_penalty_weight', default=0, type=float, help='Weight of total variation loss')
-    
-    
+    parser.add_argument("--lstruct_penalty_weight", default=0, type=float, help='Weight of lstruct')
+
+
     parser.add_argument("--number_of_epochs", default=500, type=int, help="Number of training epochs")
 
     parser.add_argument("--content_loss_layer", default='none', help='Name of content layer (vgg19)'
@@ -27,6 +28,8 @@ def args():
     parser.add_argument("--generator_checkpoint", default=None, help="Previosly saved model of generator")
     parser.add_argument("--discriminator_checkpoint", default=None, help="Previosly saved model of discriminator")
     parser.add_argument("--nn_loss_area_size", default=1, type=int, help="Use nearest neighbour loss")
+    parser.add_argument("--nn_loss_patch_size", default=1, type=int, help="Size of patch for nn_loss")
+
     parser.add_argument("--use_validation", default=1, type=int, help="Use validation")
 
     parser.add_argument('--dataset', default='market', choices=['market', 'fasion', 'fasion128', 'fasion128128'],
@@ -48,6 +51,8 @@ def args():
 
     parser.add_argument("--disc_type", default='call', choices=['call', 'sim', 'warp'],
                         help="Type of discriminator call - concat all, sim - siamease, sharewarp - warp.")
+
+
 
 
     parser.add_argument("--generated_images_dir", default='output/generated_images',
