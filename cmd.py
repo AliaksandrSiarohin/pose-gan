@@ -29,7 +29,7 @@ def args():
     parser.add_argument("--nn_loss_area_size", default=1, type=int, help="Use nearest neighbour loss")
     parser.add_argument("--use_validation", default=1, type=int, help="Use validation")
 
-    parser.add_argument('--dataset', default='market', choices=['market', 'fasion', 'fasion128'],
+    parser.add_argument('--dataset', default='market', choices=['market', 'fasion', 'fasion128', 'fasion128128'],
                         help='Market or fasion')
 
 
@@ -45,7 +45,7 @@ def args():
                         help="Type of warping skip layers to use.")
     parser.add_argument("--warp_agg", default='max', choices=['max', 'avg'],
                         help="Type of aggregation.")
-    
+
     parser.add_argument("--disc_type", default='call', choices=['call', 'sim', 'warp'],
                         help="Type of discriminator call - concat all, sim - siamease, sharewarp - warp.")
 
@@ -54,8 +54,8 @@ def args():
                         help='Folder with generated images from training dataset')
     parser.add_argument("--generated_images_save_format", default='iog',
                         help='Format of generated images i - input, o - output, g - generated')
-    
-    
+
+
 
     args = parser.parse_args()
 
@@ -68,7 +68,12 @@ def args():
     args.pairs_file_train = 'data/' + args.dataset + '-pairs-train.csv'
     args.pairs_file_test = 'data/' + args.dataset + '-pairs-test.csv'
 
-    args.image_size = (256, 256) if args.dataset == 'fasion' else (128, 64)
+    if args.dataset == 'fasion':
+        args.image_size = (256, 256)
+    elif args.dataset == 'fasion128128':
+        args.image_size = (128, 128)
+    else:
+        args.image_size = (128, 64)
     
     args.tmp_pose_dir = 'tmp/' + args.dataset + '/'
 
