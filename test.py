@@ -73,37 +73,42 @@ def load_reference_images(pairs_df, images_folder):
     return reference_images
 
 
-def load_generated_images(pairs_df, images_folder, image_size):
+def load_generated_images(images_folder, image_size):
+    import re
     images = []
-    for df_row in pairs_df.iterrows():
-        name = '_'.join([df_row[1]['from'], df_row[1]['to']]) + '.jpg'
+    d = {'from': [], 'to': []}
+    for img_name in os.listdir(images_folder):
+        m = re.match(r'([A-Za-z0-9_]*.jpg)_([A-Za-z0-9_]*.jpg)', img_name)
+        fr = m.groups()[0]
+        to = m.groups()[1]
+        d['from'].append(fr)
+        d['to'].append(to)
+
         img_index = 2
-        images.append(imread(os.path.join(images_folder, name))[:,
+        images.append(imread(os.path.join(images_folder, img_name))[:,
                             (img_index*image_size[1]):((img_index+1)*image_size[1])])
-        imsave('1.png', images[-1])
-    return images
+    return images, pd.DataFrame(d)
 
 def test():
     args = cmd.args()
-
-    dataset = PoseHMDataset(args.images_dir_test, 1, args.image_size, args.pairs_file_test,
+    if args.load_generated_images:
+        print ("Loading images...")
+        generated_images, pairs_df = load_generated_images(args.generated_images_dir, args.image_size)
+    else:
+        print ("Generate images...")
+        dataset = PoseHMDataset(args.images_dir_test, 1, args.image_size, args.pairs_file_test,
                             args.annotations_file_test, args.use_input_pose, args.warp_skip, args.disc_type, args.tmp_pose_dir,
                             use_validation=0, shuffle=False)
-
-    pairs_df = dataset._pairs_file
-    print ("Generate images...")
-    if args.load_generated_images:
-        generated_images = load_generated_images(pairs_df, args.generated_images_dir, args.image_size)
-    else:
+        pairs_df = dataset._pairs_file
         generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type, args.warp_agg)
         assert (args.generator_checkpoint is not None)
         generator.load_weights(args.generator_checkpoint)
         generated_images = generate_images(dataset, generator, pairs_df.shape[0], out_index=-2)
-    reference_images = load_reference_images(pairs_df, args.images_dir_test)
+        print ("Save images to %s..." % (args.generated_images_dir, ))
+        save_images(pairs_df, generated_images, args.images_dir_test,
+                        args.generated_images_dir, args.generated_images_save_format)
 
-    print ("Save images to %s..." % (args.generated_images_dir, ))
-    save_images(pairs_df, generated_images, args.images_dir_test,
-                args.generated_images_dir, args.generated_images_save_format)
+    reference_images = load_reference_images(pairs_df, args.images_dir_test)
 
     print ("Compute inception score...")
     inception_score = get_inception_score(generated_images)
