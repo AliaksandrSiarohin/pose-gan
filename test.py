@@ -69,7 +69,7 @@ def test():
                 args.generated_images_dir, args.generated_images_save_format)
 
     print ("Compute inception score...")
-    inception_score = get_inception_score(generated_images)
+    inception_score = 0#get_inception_score(generated_images)
 
     print ("Compute structured similarity score (SSIM)...")
     structured_score = ssim_score(pairs_df, generated_images, args.images_dir_test)
@@ -77,7 +77,14 @@ def test():
     print ("Compute l1 score...")
     norm_score = l1_score(pairs_df, generated_images, args.images_dir_test)
 
-    print ("Inception score = %s, SSIM score = %s, l1 score = %s" % (inception_score, structured_score, norm_score))
+    print ("Compute ssd score...")
+    from ssd_score import compute_ssd_score
+    scorer = compute_ssd_score.SSDScorer(model_def='ssd_score/deploy.prototxt',
+                                         model_weights='ssd_score/VGG_VOC0712_SSD_300x300_iter_120000.caffemodel')
+    ssd_score = scorer.get_score_image_set(generated_images)
+
+    print ("Inception score = %s, SSIM score = %s, SSD score = %s, l1 score = %s" %
+           (inception_score, structured_score, ssd_score, norm_score))
 
 
 
