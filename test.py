@@ -96,6 +96,9 @@ def test():
         generated_images, pairs_df = load_generated_images(args.generated_images_dir, args.image_size)
     else:
         print ("Generate images...")
+        from keras import backend as K
+        if args.use_dropout_test:
+            K.set_learning_phase(1)
         dataset = PoseHMDataset(args.images_dir_test, 1, args.image_size, args.pairs_file_test,
                             args.annotations_file_test, args.use_input_pose, args.warp_skip, args.disc_type, args.tmp_pose_dir,
                             use_validation=0, shuffle=False)

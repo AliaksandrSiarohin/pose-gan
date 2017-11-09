@@ -58,6 +58,9 @@ def args():
     parser.add_argument('--load_generated_images', default=0, type=int,
                         help='Load images from generated_images_dir or generate')
 
+    parser.add_argument('--use_dropout_test', default=0, type=int,
+                        help='To use dropout when generate images')
+
     args = parser.parse_args()
 
     args.images_dir_train = 'data/' + args.dataset + '-dataset/train'
