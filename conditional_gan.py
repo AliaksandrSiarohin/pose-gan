@@ -11,7 +11,7 @@ from gan.layer_utils import content_features_model
 
 from keras.optimizers import Adam
 from pose_transform import AffineTransformLayer
-import numpy as np
+
 
 def block(out, nkernels, down=True, bn=True, dropout=False, leaky=True):
     if leaky:
@@ -192,7 +192,7 @@ def total_variation_loss(x, image_size):
     return K.sum(K.pow(a + b, 1.25))
 
 
-def nn_loss(target, reference, neighborhood_size=(3, 3), patch_size=(1, 1)):
+def nn_loss(reference, target, neighborhood_size=(3, 3)):
     v_pad = neighborhood_size[0] / 2
     h_pad = neighborhood_size[1] / 2
     val_pad = ktf.pad(reference, [[0, 0], [v_pad, v_pad], [h_pad, h_pad], [0, 0]],
@@ -209,42 +209,29 @@ def nn_loss(target, reference, neighborhood_size=(3, 3), patch_size=(1, 1)):
     reference = ktf.concat(reference_tensors, axis=-1)
     target = ktf.expand_dims(target, axis=-1)
 
-    print (reference.shape)
-    print (target.shape)
     abs = ktf.abs(reference - target)
     norms = ktf.reduce_sum(abs, reduction_indices=[-2])
-
-    if patch_size[0] != 1:
-        n_windows = neighborhood_size[0] * neighborhood_size[1]
-        sum_filter = np.zeros(list(patch_size) + [n_windows, n_windows], dtype=float)
-        for i in range(n_windows):
-            sum_filter[:,:,i,i] = np.ones(patch_size)
-
-        norms = ktf.nn.conv2d(norms, sum_filter, [1, 1, 1, 1], "VALID")
     loss = ktf.reduce_min(norms, reduction_indices=[-1])
 
     return loss
 
-
 class CGAN(GAN):
     def __init__(self, generator, discriminator, l1_penalty_weight, gan_penalty_weight, use_input_pose, image_size,
-                 content_loss_layer, tv_penalty_weight, nn_loss_area_size, pose_estimator, lstruct_penalty_weight,
-                 nn_loss_patch_size, **kwargs):
+                 content_loss_layer, tv_penalty_weight, nn_loss_area_size, lstruct_penalty_weight, **kwargs):
         super(CGAN, self).__init__(generator, discriminator, generator_optimizer=Adam(2e-4, 0.5, 0.999),
                                     discriminator_optimizer=Adam(2e-4, 0.5, 0.999), **kwargs)
         generator.summary()
         self._l1_penalty_weight= l1_penalty_weight
-        self.generator_metric_names = ['gan_loss', 'l1_loss', 'tv_loss', 'struct_loss']
+        self.generator_metric_names = ['gan_loss', 'l1_loss', 'tv_loss', 'lstruct']
         self._use_input_pose = use_input_pose
         self._image_size = image_size
         self._content_loss_layer = content_loss_layer
         self._gan_penalty_weight = gan_penalty_weight
         self._tv_penalty_weight = tv_penalty_weight
         self._nn_loss_area_size = nn_loss_area_size
-        self._nn_loss_patch_size = nn_loss_patch_size
         if lstruct_penalty_weight != 0:
             from keras.models import load_model
-            self._pose_estimator = load_model(pose_estimator)
+            self._pose_estimator = load_model(kwargs['pose_estimator'])
         self._lstruct_penalty_weight = lstruct_penalty_weight
 
     def _compile_generator_loss(self):
@@ -252,8 +239,7 @@ class CGAN(GAN):
         
         def st_loss(a, b):
             if self._nn_loss_area_size > 1:
-                return nn_loss(a, b, (self._nn_loss_area_size, self._nn_loss_area_size),
-                               (self._nn_loss_patch_size, self._nn_loss_patch_size))
+                return nn_loss(a, b, (self._nn_loss_area_size, self._nn_loss_area_size))
             else:                    
                 return K.mean(K.abs(a - b))
         
@@ -274,16 +260,16 @@ class CGAN(GAN):
             l1_loss = self._l1_penalty_weight * st_loss(reference, target)
 
         if self._lstruct_penalty_weight != 0:
-            target_struct = ktf.image.resize_images(self._generator_input[image_index + 1], (self._image_size[0] / 8,
-                                                                                             self._image_size[1] / 8))
-            struct = self._pose_estimator(self._discriminator_fake_input[image_index])[1][..., :18]
+            target_struct = self._pose_estimator(self._generator_input[image_index][..., ::-1] / 2)[1][..., :18]
+            struct = self._pose_estimator(self._discriminator_fake_input[image_index][..., ::-1] / 2)[1][..., :18]
             struct_loss = self._lstruct_penalty_weight * K.mean((target_struct - struct) ** 2)
-            print (struct_loss.shape)
         else:
             struct_loss = K.constant(0)
 
+        def struct_loss_fn(y_true, y_pred):
+            return struct_loss
         
-        def tv_loss_fn(y_true, y_pred):
+        def tv_loss(y_true, y_pred):
             return self._tv_penalty_weight * total_variation_loss(self._discriminator_fake_input[image_index], self._image_size)
         
         def l1_loss_fn(y_true, y_pred):
@@ -292,13 +278,10 @@ class CGAN(GAN):
         def gan_loss_fn(y_true, y_pred):
             loss = super(CGAN, self)._compile_generator_loss()[0](y_true, y_pred)
             return K.constant(0) if self._gan_penalty_weight == 0 else self._gan_penalty_weight * loss
-
-        def struct_loss_fn(y_true, y_pred):
-            return struct_loss
             
         def generator_loss(y_true, y_pred):
-            return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred) + tv_loss_fn(y_true, y_pred)
-        return generator_loss, [gan_loss_fn, l1_loss_fn, tv_loss_fn, struct_loss_fn]
+            return gan_loss_fn(y_true, y_pred) + l1_loss_fn(y_true, y_pred) + tv_loss(y_true, y_pred) + struct_loss_fn(y_true, y_pred)
+        return generator_loss, [gan_loss_fn, l1_loss_fn, tv_loss, struct_loss_fn]
 
     # def compile_models(self):
     #     if self._use_input_pose:
