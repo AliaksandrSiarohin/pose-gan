@@ -171,8 +171,15 @@ def estimate_polygon(fr, to, st, inc_to, inc_from, p_to, p_from):
 
     norm_vec = fr - to
     norm_vec = np.array([-norm_vec[1], norm_vec[0]])
-    norm_vec = norm_vec / np.linalg.norm(norm_vec)
-
+    norm = np.linalg.norm(norm_vec)
+    if norm == 0:
+        return np.array([
+            fr + 1,
+            fr - 1,
+            to - 1,
+            to + 1,
+        ])
+    norm_vec = norm_vec / norm
     vetexes = np.array([
         fr + st * p_from * norm_vec,
         fr - st * p_from * norm_vec,
