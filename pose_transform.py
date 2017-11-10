@@ -27,7 +27,6 @@ class AffineTransformLayer(Layer):
 
     def build(self, input_shape):
         self.image_size = list(input_shape[0][1:])
-        print (self.init_image_size)
         self.affine_mul = [1, 1, self.init_image_size[0] / self.image_size[0],
                            1, 1, self.init_image_size[1] / self.image_size[1],
                            1, 1]
@@ -183,7 +182,7 @@ def estimate_polygon(fr, to, st, inc_to, inc_from, p_to, p_from):
 
     return vetexes
 
-def affine_transforms(array1, array2, img):
+def affine_transforms(array1, array2):
     kp1 = give_name_to_keypoints(array1)
     kp2 = give_name_to_keypoints(array2)
 
@@ -195,7 +194,6 @@ def affine_transforms(array1, array2, img):
 
     transforms = []
     def to_transforms(tr):
-        print (np.linalg.cond(tr))
         if np.linalg.cond(tr) < 1e100:
             transforms.append(tr)
         else:
@@ -321,7 +319,7 @@ if __name__ == "__main__":
         m = resize(m, (256, 256), preserve_range=True).astype(bool)
         fr_img = resize(fr_img, (256, 256), preserve_range=True).astype(float)
 
-        tr = affine_transforms(kp_fr, kp_to, fr_img)[1:]
+        tr = affine_transforms(kp_fr, kp_to)[1:]
         masks = pose_masks(kp_to, fr_img.shape[:2])[1:]
 
         x = Input(fr_img.shape)
