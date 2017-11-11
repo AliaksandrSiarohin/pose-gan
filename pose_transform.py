@@ -201,9 +201,11 @@ def affine_transforms(array1, array2):
 
     transforms = []
     def to_transforms(tr):
-        if np.linalg.cond(tr) < 1e100:
+        from numpy.linalg import LinAlgError
+        try:
+            np.linalg.inv(tr)
             transforms.append(tr)
-        else:
+        except LinAlgError:
             transforms.append(no_point_tr)
 
     body_poly_1 = get_array_of_points(kp1, ['Rhip', 'Lhip', 'Lsho', 'Rsho'])
@@ -269,7 +271,12 @@ def estimate_uniform_transform(array1, array2):
     no_point_tr = np.array([[1, 0, 1000], [0, 1, 1000], [0, 0, 1]])
 
     def check_invertible(tr):
-        return np.linalg.cond(tr) < 10000
+        from numpy.linalg import LinAlgError
+        try:
+            np.linalg.inv(tr)
+            return True
+        except LinAlgError:
+            return False
 
     keypoint_names = {'Rhip', 'Lhip', 'Lsho', 'Rsho'}
     candidate_names = {'Rkne', 'Lkne'}
@@ -295,12 +302,14 @@ if __name__ == "__main__":
     import pandas as pd
     import os
     from skimage.transform import resize
-    pairs_df = pd.read_csv('data/fasion-pairs-train.csv')
-    kp_df = pd.read_csv('data/fasion-annotation-train.csv', sep=':')
-    img_folder = 'data/fasion-dataset/train'
+    pairs_df = pd.read_csv('data/fasion-pairs-test.csv')
+    kp_df = pd.read_csv('data/fasion-annotation-test.csv', sep=':')
+    img_folder = 'data/fasion-dataset/test'
+    f = open('lolkek.txt', 'w')
     for _, row in pairs_df.iterrows():
-        fr = row['from']
-        to = row['to']
+
+        fr = 'fasionMENJacketsVestsid0000243904_1front.jpg'# row['from']
+        to = 'fasionMENJacketsVestsid0000243904_4full.jpg'#row['to']
         fr_img = imread(os.path.join(img_folder, fr))
         to_img = imread(os.path.join(img_folder, to))
 
@@ -322,18 +331,24 @@ if __name__ == "__main__":
         img[m] = p[m]
         plt.imshow(img)
 
+        # tr = estimate_uniform_transform(kp_fr, kp_to)
+        #
+        # no_point_tr = np.array([[1, 0, 1000], [0, 1, 1000], [0, 0, 1]])
+        # if np.all(tr == no_point_tr.reshape((-1, 9))[..., :-1]):
+        #     print >>f, '_'.join([fr,to]) + '.jpg'
+
         p = resize(p, (256, 256), preserve_range=True).astype(np.uint8)
         m = resize(m, (256, 256), preserve_range=True).astype(bool)
         fr_img = resize(fr_img, (256, 256), preserve_range=True).astype(float)
 
-        tr = affine_transforms(kp_fr, kp_to)[1:]
-        masks = pose_masks(kp_to, fr_img.shape[:2])[1:]
+        tr = affine_transforms(kp_fr, kp_to)
+        masks = pose_masks(kp_to, fr_img.shape[:2])
 
         x = Input(fr_img.shape)
-        i = Input((9, 8))
-        mm = Input([9] + list(fr_img.shape[:2]))
+        i = Input((10, 8))
+        mm = Input([10] + list(fr_img.shape[:2]))
 
-        y = AffineTransformLayer(9, 'max', (256, 256))([x, i, mm])
+        y = AffineTransformLayer(10, 'max', (256, 256))([x, i, mm])
         model = Model(inputs=[x, i, mm], outputs=y)
 
         b = model.predict([fr_img[np.newaxis], tr[np.newaxis], masks[np.newaxis]])
@@ -344,6 +359,8 @@ if __name__ == "__main__":
         plt.imshow(a)
 
         plt.show()
+        #f.flush()
+
 
 
 

@@ -12,52 +12,47 @@ import pandas as pd
 import os
 
 class PoseHMDataset(UGANDataset):
-    def __init__(self, images_dir, batch_size, image_size, pairs_file, annotations_file,
-                 use_input_pose, warp_skip, disc_type, tmp_pose_dir, use_validation, shuffle=True, **kwargs):
-        super(PoseHMDataset, self).__init__(batch_size, None)
-        self._batch_size = batch_size
-        self._image_size = image_size
-        self._images_dir = images_dir
-        self._pairs_file = pd.read_csv(pairs_file)
-        self._use_validation = use_validation
-        if self._use_validation:
-            self.validation_split()
+    def __init__(self, test_phase=False, **kwargs):
+        super(PoseHMDataset, self).__init__(kwargs['batch_size'], None)
+        self._test_phase = test_phase
 
-        self._annotations_file = pd.read_csv(annotations_file, sep=':')
+        self._batch_size = 1 if self._test_phase else kwargs['batch_size']
+        self._image_size = kwargs['image_size']
+        self._images_dir_train = kwargs['images_dir_train']
+        self._images_dir_test = kwargs['images_dir_test']
+
+        self._pairs_file_train = pd.read_csv(kwargs['pairs_file_train'])
+        self._pairs_file_test = pd.read_csv(kwargs['pairs_file_test'])
+
+        self._annotations_file_test = pd.read_csv(kwargs['annotations_file_train'], sep=':')
+        self._annotations_file_train = pd.read_csv(kwargs['annotations_file_test'], sep=':')
+
+        self._annotations_file = pd.concat([self._annotations_file_test, self._annotations_file_train],
+                                           axis=0, ignore_index=True)
+
         self._annotations_file = self._annotations_file.set_index('name')
-        self._use_input_pose = use_input_pose
-        self._warp_skip = warp_skip
-        self._shuffle = shuffle
-        self._disc_type = disc_type
-        self._tmp_pose = tmp_pose_dir
-        if not os.path.exists(self._tmp_pose):
-            os.makedirs(self._tmp_pose) 
-        print ("Number of images: %s" % len(self._annotations_file))
-        print ("Number of pairs train: %s" % len(self._pairs_file))
-        if self._use_validation:
-            print ("Number of pairs val: %s" % len(self._pairs_file_val))
 
-        self._batches_before_shuffle = int(self._annotations_file.shape[0] // self._batch_size)
+        self._use_input_pose = kwargs['use_input_pose']
+        self._warp_skip = kwargs['warp_skip']
+        self._disc_type = kwargs['disc_type']
+        self._tmp_pose = kwargs['tmp_pose_dir']
+
+        self._test_data_index = 0
+
+        if not os.path.exists(self._tmp_pose):
+            os.makedirs(self._tmp_pose)
+
+        print ("Number of images: %s" % len(self._annotations_file))
+        print ("Number of pairs train: %s" % len(self._pairs_file_train))
+        print ("Number of pairs test: %s" % len(self._pairs_file_test))
+
+        self._batches_before_shuffle = int(self._pairs_file_train.shape[0] // self._batch_size)
 
     def number_of_batches_per_epoch(self):
         return 1000
 
     def number_of_batches_per_validation(self):
-        return len(self._pairs_file_val) // self._batch_size
-
-    def validation_split(self):
-        np.random.seed(0)
-        img_names = self._pairs_file['from']
-        ids = img_names.apply(lambda img: img.split('_')[0])
-        unique_ids = pd.unique(ids)
-        val_ids = set(np.random.choice(unique_ids, size=int(0.1 * len(unique_ids)), replace=False))
-
-        val_mask = ids.isin(val_ids)
-        train_pairs = self._pairs_file[np.logical_not(val_mask)]
-        val_pairs = self._pairs_file[val_mask]
-
-        self._pairs_file_val = val_pairs
-        self._pairs_file = train_pairs
+        return len(self._pairs_file_test) // self._batch_size
 
     def compute_pose_map_batch(self, pair_df, direction):
         assert direction in ['to', 'from']
@@ -109,15 +104,18 @@ class PoseHMDataset(UGANDataset):
         batch = np.empty([self._batch_size] + list(self._image_size) + [3])
         i = 0
         for _, p in pair_df.iterrows():
-            batch[i] = imread(os.path.join(self._images_dir, p[direction]))
+            if os.path.exists(os.path.join(self._images_dir_train, p[direction])):
+                batch[i] = imread(os.path.join(self._images_dir_train, p[direction]))
+            else:
+                batch[i] = imread(os.path.join(self._images_dir_test, p[direction]))
             i += 1
         return self._preprocess_image(batch)
 
     def load_batch(self, index, for_discriminator, validation=False):
         if validation:
-            pair_df = self._pairs_file_val.iloc[index]
+            pair_df = self._pairs_file_test.iloc[index]
         else:
-            pair_df = self._pairs_file.iloc[index]
+            pair_df = self._pairs_file_train.iloc[index]
         result = [self.load_image_batch(pair_df, 'from')]
         if self._use_input_pose:
             result.append(self.compute_pose_map_batch(pair_df, 'from'))
@@ -132,17 +130,23 @@ class PoseHMDataset(UGANDataset):
         index = self._next_data_index()
         return self.load_batch(index, False)
 
-    def next_generator_sample_validation(self):
-        index = np.random.choice(len(self._pairs_file_val), size=self._batch_size)
-        return self.load_batch(index, False, True)
+    def next_generator_sample_test(self, with_names=False):
+        index = np.arange(self._test_data_index, self._test_data_index + self._batch_size)
+        index = index % self._pairs_file_test.shape[0]
+        batch = self.load_batch(index, False, True)
+        names = self._pairs_file_test.iloc[index]
+        self._test_data_index += self._batch_size
+        if with_names:
+            return batch, names
+        else:
+            return batch
 
     def next_discriminator_sample(self):
         index = self._next_data_index()
         return self.load_batch(index, True)
 
     def _shuffle_data(self):
-        if self._shuffle:
-            self._pairs_file = self._pairs_file.sample(frac=1)
+        self._pairs_file_train = self._pairs_file_train.sample(frac=1)
         
     def display(self, output_batch, input_batch):
         row = self._batch_size

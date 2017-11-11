@@ -50,8 +50,6 @@ def args():
 
     parser.add_argument("--generated_images_dir", default='output/generated_images',
                         help='Folder with generated images from training dataset')
-    parser.add_argument("--generated_images_save_format", default='iog',
-                        help='Format of generated images i - input, o - output, g - generated')
 
     parser.add_argument('--load_generated_images', default=0, type=int,
                         help='Load images from generated_images_dir or generate')
