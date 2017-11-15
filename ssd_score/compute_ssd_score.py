@@ -46,13 +46,14 @@ if __name__ == "__main__":
     import os
     from argparse import ArgumentParser
 
-    split = lambda s: tuple(s.split(','))
+    split = lambda s: tuple(map(int, s.split(',')))
     parser = ArgumentParser(description="Computing ssd_score")
     parser.add_argument("--image_size", default=(128,64), type=split, help='Image size')
     parser.add_argument("--input_dir", default='../output/generated_images', help='Folder with images')
     parser.add_argument("--img_index", default=0, type=int,  help='Index of image generated image '
                                                                   'for results with multiple images')
     args = parser.parse_args()
+    print (args)
 
     imgs = []
     for name in os.listdir(args.input_dir):
