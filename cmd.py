@@ -39,7 +39,7 @@ def args():
     parser.add_argument("--images_for_test", default=12000, type=int, help="Number of images for testing")
 
     parser.add_argument("--use_input_pose", default=True, type=int, help='Feed to generator input pose')
-    parser.add_argument("--warp_skip", default='none', choices=['none', 'full', 'mask'],
+    parser.add_argument("--warp_skip", default='stn', choices=['none', 'full', 'mask', 'stn'],
                         help="Type of warping skip layers to use.")
     parser.add_argument("--warp_agg", default='max', choices=['max', 'avg'],
                         help="Type of aggregation.")
