@@ -1,4 +1,4 @@
-# Generation of human images in given pose.
+# Deformable GANs for Pose-based Human Image Generation.
 ### Requirment
 * python2
 * Numpy
@@ -7,6 +7,7 @@
 * Pandas
 * Tensorflow
 * Keras
+* tqdm 
 
 ### Training
 In orger to train a model:
@@ -16,5 +17,6 @@ In orger to train a model:
 4. Run ```python train.py``` (see list of parameters in cmd.py)
 
 ### Testing
+0. Download checkpoints (https://yadi.sk/d/dxVvYxBw3QuUT9).
 1. Run ```python test.py --generator_checkpoint path/to/generator/checkpoint``` (and same parameters as in train.py). It generate images and compute inception score, SSIM score and their masked versions.
 2. To compute ssd_score. Download pretrained on VOC 300x300 model from https://github.com/weiliu89/caffe/tree/ssd. Put it in the ssd_score forlder. Run ```python compute_ssd_score.py --input_dir path/to/generated/images --img_index 2```
