@@ -11,7 +11,8 @@
 
 ### Training
 In orger to train a model:
-1. Create folder market-dataset with 2 subfolder (test and train). Put the test images in test images in test/ and train images in train/.
+1. Download market dataset https://drive.google.com/file/d/0B8-rUzbwVRk0c054eEozWG9COHM/view. Put it in data folder. Rename this folder to data/market-dataset. Rename bounding_box_test and bounding_box_train with test and train. 
+* Instructions for fasion comming soon
 2. Download pose estimator (conversion of this https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) [pose_estimator.h5](https://yadi.sk/d/blgmGpDi3PjXvK). Launch ```python compute_cordinates.py.``` It will compute human keypoints. Alternativlly you can download key points estimations from (https://yadi.sk/d/suymftBy3S7oKD).
 3. Create pairs dataset with ```python create_pairs_dataset.py```. It define pairs for training.
 4. Run ```python train.py``` (see list of parameters in cmd.py)
@@ -35,6 +36,7 @@ To replicate the experiment in the paper use following setup:
 ```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/full --checkpoints_dir output/full --warp_skip mask --dataset fasion --l1_penalty_weight 0.01 --nn_loss_area_size 5 --batch_size 2 --content_loss_layer block1_conv2 --number_of_epochs 90```
 ##### feature matching
 ```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/fm --checkpoints_dir output/fm --warp_skip mask --dataset fasion --l1_penalty_weight 0.5 --batch_size 4 --content_loss_layer block2_conv1 --number_of_epochs 90```
+
 ### Testing
 0. Download checkpoints (https://yadi.sk/d/dxVvYxBw3QuUT9).
 1. Run ```python test.py --generator_checkpoint path/to/generator/checkpoint``` (and same parameters as in train.py). It generate images and compute inception score, SSIM score and their masked versions.
