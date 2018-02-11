@@ -25,7 +25,7 @@ def block(out, nkernels, down=True, bn=True, dropout=False, leaky=True):
         out = Conv2DTranspose(nkernels, kernel_size=(4, 4), strides=(2, 2), use_bias=False)(out)
         out = Cropping2D((1,1))(out)
     if bn:
-        out = InstanceNormalization(axis=-1)(out)
+        out = InstanceNormalization()(out)
     if dropout:
         out = Dropout(0.5)(out)
     return out
