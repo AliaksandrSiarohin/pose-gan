@@ -9,6 +9,9 @@
 * Keras
 * tqdm 
 
+### Clone repository
+```git clone --recursive https://github.com/AliaksandrSiarohin/pose-gan/``` (It is important to clone it like this, code not work with master branch of gan submodule).
+
 ### Training
 In orger to train a model:
 1. Download market dataset https://drive.google.com/file/d/0B8-rUzbwVRk0c054eEozWG9COHM/view. Put it in data folder. Rename this folder to data/market-dataset. Rename bounding_box_test and bounding_box_train with test and train. 
