@@ -8,14 +8,14 @@ import pose_transform
 import numpy as np
 
 args = args()
-in_folder = '../out/nn_loss'
-out_folder = 'lolkekchebureck'
+in_folder = 'ref_nn_fasion'
+out_folder = 'ref_nn_fasion_separated'
 
 if not os.path.exists(out_folder):
     os.makedirs(out_folder)
 
-args.annotations_file_test = 'data/annotations-test.csv'
-args.images_dir_test = 'data/market-dataset/test_1'
+args.annotations_file_test =  'data/fasion-annotation-train.csv'
+args.images_dir_test = 'data/fasion-dataset/train'
 
 for n, img_pair in enumerate(os.listdir(in_folder)):
     m = re.match(r'([A-Za-z0-9_]*.jpg)_([A-Za-z0-9_]*.jpg)', img_pair)
@@ -28,7 +28,6 @@ for n, img_pair in enumerate(os.listdir(in_folder)):
     df = pd.read_csv(args.annotations_file_test, sep=':')
     ano_fr = df[df['name'] == fr].iloc[0]
     ano_to = df[df['name'] == to].iloc[0]
-
     kp_fr = pose_utils.load_pose_cords_from_strings(ano_fr['keypoints_y'], ano_fr['keypoints_x'])
     kp_to = pose_utils.load_pose_cords_from_strings(ano_to['keypoints_y'], ano_to['keypoints_x'])
 
@@ -50,18 +49,18 @@ for n, img_pair in enumerate(os.listdir(in_folder)):
     imsave(os.path.join(cur_folder, 'frpose.jpg'), pose_fr)
     imsave(os.path.join(cur_folder, 'topose.jpg'), pose_to)
 
-    imsave(os.path.join(cur_folder, 'mask.jpg'), mask)
+    # imsave(os.path.join(cur_folder, 'mask.jpg'), mask)
 
     imsave(os.path.join(cur_folder, 'gen.jpg'), gen_img)
 
     hm_from = pose_utils.cords_to_map(kp_fr, args.image_size).sum(axis=-1)
     hm_to = pose_utils.cords_to_map(kp_to, args.image_size).sum(axis=-1)
 
-    hm_from /= hm_from.max()
-    hm_to /= hm_to.max()
-
-    imsave(os.path.join(cur_folder, 'hm_from.jpg'), hm_from)
-
-    imsave(os.path.join(cur_folder, 'hm_to.jpg'), hm_to)
+    # hm_from /= hm_from.max()
+    # hm_to /= hm_to.max()
+    #
+    # imsave(os.path.join(cur_folder, 'hm_from.jpg'), hm_from)
+    #
+    # imsave(os.path.join(cur_folder, 'hm_to.jpg'), hm_to)
 
 

@@ -74,9 +74,11 @@ class PoseHMDataset(UGANDataset):
     def compute_cord_warp_batch(self, pair_df):
         if self._warp_skip == 'full':
             batch = [np.empty([self._batch_size] + [1, 8])]
-        else:
+        elif self._warp_skip == 'mask':
             batch = [np.empty([self._batch_size] + [10, 8]),
                      np.empty([self._batch_size, 10] + list(self._image_size))]
+        else:
+            batch = [np.empty([self._batch_size] + [72])]
         i = 0
         for _, p in pair_df.iterrows():
             fr = self._annotations_file.loc[p['from']]
@@ -88,8 +90,11 @@ class PoseHMDataset(UGANDataset):
             if self._warp_skip == 'mask':
                 batch[0][i] = pose_transform.affine_transforms(kp_array1, kp_array2)
                 batch[1][i] = pose_transform.pose_masks(kp_array2, self._image_size)
-            else:
+            elif self._warp_skip == 'full':
                 batch[0][i] = pose_transform.estimate_uniform_transform(kp_array1, kp_array2)
+            else: #sel._warp_skip == 'stn'
+                batch[0][i][:36] = kp_array1.reshape((-1, ))
+                batch[0][i][36:] = kp_array2.reshape((-1, ))
             i += 1
         return batch
 
@@ -159,12 +164,12 @@ class PoseHMDataset(UGANDataset):
 
         res_img = self._deprocess_image(output_batch[2 if self._use_input_pose else 1])
 
-        tg_app = super(PoseHMDataset, self).display(tg_app, None, row=row, col=col)
+        tg_app = super(PoseHMDataset, self).display(tg_app, None)
 
         pose_images = np.array([pose_utils.draw_pose_from_map(pose)[0] for pose in tg_pose])
-        tg_pose = super(PoseHMDataset, self).display(pose_images, None, row=row, col=col)
+        tg_pose = super(PoseHMDataset, self).display(pose_images, None)
 
-        tg_img = super(PoseHMDataset, self).display(tg_img, None, row=row, col=col)
-        res_img = super(PoseHMDataset, self).display(res_img, None, row=row, col=col)
+        tg_img = super(PoseHMDataset, self).display(tg_img, None)
+        res_img = super(PoseHMDataset, self).display(res_img, None)
 
         return np.concatenate(np.array([tg_app, tg_pose, tg_img, res_img]), axis=1)
