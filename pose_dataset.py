@@ -164,12 +164,12 @@ class PoseHMDataset(UGANDataset):
 
         res_img = self._deprocess_image(output_batch[2 if self._use_input_pose else 1])
 
-        tg_app = super(PoseHMDataset, self).display(tg_app, None)
+        tg_app = super(PoseHMDataset, self).display(tg_app, None, row=row, col=col)
 
         pose_images = np.array([pose_utils.draw_pose_from_map(pose)[0] for pose in tg_pose])
-        tg_pose = super(PoseHMDataset, self).display(pose_images, None)
+        tg_pose = super(PoseHMDataset, self).display(pose_images, None, row=row, col=col)
 
-        tg_img = super(PoseHMDataset, self).display(tg_img, None)
-        res_img = super(PoseHMDataset, self).display(res_img, None)
+        tg_img = super(PoseHMDataset, self).display(tg_img, None, row=row, col=col)
+        res_img = super(PoseHMDataset, self).display(res_img, None, row=row, col=col)
 
         return np.concatenate(np.array([tg_app, tg_pose, tg_img, res_img]), axis=1)
