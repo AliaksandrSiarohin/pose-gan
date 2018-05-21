@@ -12,10 +12,16 @@
 * Keras
 * tqdm 
 
+### Clone repository
+```git clone --recursive https://github.com/AliaksandrSiarohin/pose-gan/``` (It is important to clone it like this, code not work with master branch of gan submodule).
+
 ### Training
 In orger to train a model:
 1. Download market dataset https://drive.google.com/file/d/0B8-rUzbwVRk0c054eEozWG9COHM/view. Put it in data folder. Rename this folder to data/market-dataset. Rename bounding_box_test and bounding_box_train with test and train. 
-* Instructions for fasion comming soon
+
+
+1.1 Download deep fasion dataset http://mmlab.ie.cuhk.edu.hk/projects/DeepFashion.html (In-shop Clothes Retrieval Benchmark). You will need to ask a pasword from dataset maintainers. Move img/ to data folder and rename it fasion/. Download key-point estimations from (https://yadi.sk/d/suymftBy3S7oKD) for fasion. Run script ```split_fasion_data.py``` in data/ folder. Go to the step 3. 
+
 2. Download pose estimator (conversion of this https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) [pose_estimator.h5](https://yadi.sk/d/blgmGpDi3PjXvK). Launch ```python compute_cordinates.py.``` It will compute human keypoints. Alternativlly you can download key points estimations from (https://yadi.sk/d/suymftBy3S7oKD).
 3. Create pairs dataset with ```python create_pairs_dataset.py```. It define pairs for training.
 4. Run ```python train.py``` (see list of parameters in cmd.py)
