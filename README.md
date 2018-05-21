@@ -10,6 +10,7 @@
 * Pandas
 * Tensorflow
 * Keras
+* Keras-contrib
 * tqdm 
 
 ### Clone repository
