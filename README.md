@@ -1,4 +1,7 @@
 # Deformable GANs for Pose-based Human Image Generation.
+[Check out our paper](https://arxiv.org/abs/1801.00055)
+![Screenshot](sup-mat/teaser.jpg)
+
 ### Requirment
 * python2
 * Numpy
@@ -44,3 +47,5 @@ To replicate the experiment in the paper use following setup:
 
 #### Additional notes
 Both training and testing require large amount of disk space, because ```compute_pose_map_batch``` in ```pose_dataset.py``` store intermediate pose_maps on disk. This help to improve both training and testing time. If you don't have enogh space comment lines 64,65,66 and 69 in ```pose_dataset.py```
+
+Check sup-mat for additional data from paper: RE-ID experiment, user study images, names of the images from paper.
