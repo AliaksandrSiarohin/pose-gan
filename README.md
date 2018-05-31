@@ -21,7 +21,7 @@ In orger to train a model:
 1. Download market dataset https://drive.google.com/file/d/0B8-rUzbwVRk0c054eEozWG9COHM/view. Put it in data folder. Rename this folder to data/market-dataset. Rename bounding_box_test and bounding_box_train with test and train. 
 
 
-1.1 Download deep fasion dataset http://mmlab.ie.cuhk.edu.hk/projects/DeepFashion.html (In-shop Clothes Retrieval Benchmark). You will need to ask a pasword from dataset maintainers. Move img/ to data folder and rename it fasion/. Download key-point estimations from (https://yadi.sk/d/suymftBy3S7oKD) for fasion. Run script ```split_fasion_data.py``` in data/ folder. Go to the step 3. 
+1.1 Download deep [fasion dataset in-shop clothes retrival benchmark](http://mmlab.ie.cuhk.edu.hk/projects/DeepFashion/InShopRetrieval.html). You will need to ask a pasword from dataset maintainers. Move img/ to data folder and rename it fasion/. Download key-point estimations from (https://yadi.sk/d/suymftBy3S7oKD) for fasion. Run script ```split_fasion_data.py``` in data/ folder. Go to the step 3. 
 
 2. Download pose estimator (conversion of this https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) [pose_estimator.h5](https://yadi.sk/d/blgmGpDi3PjXvK). Launch ```python compute_cordinates.py.``` It will compute human keypoints. Alternativlly you can download key points estimations from (https://yadi.sk/d/suymftBy3S7oKD).
 3. Create pairs dataset with ```python create_pairs_dataset.py```. It define pairs for training.
@@ -50,7 +50,7 @@ To replicate the experiment in the paper use following setup:
 ### Testing
 0. Download checkpoints (https://yadi.sk/d/dxVvYxBw3QuUT9).
 1. Run ```python test.py --generator_checkpoint path/to/generator/checkpoint``` (and same parameters as in train.py). It generate images and compute inception score, SSIM score and their masked versions.
-2. To compute ssd_score. Download pretrained on VOC 300x300 model from https://github.com/weiliu89/caffe/tree/ssd. Put it in the ssd_score forlder. Run ```python compute_ssd_score.py --input_dir path/to/generated/images --img_index 2```
+2. To compute ssd_score. Download pretrained on VOC 300x300 model and install propper caffe version https://github.com/weiliu89/caffe/tree/ssd. Put it in the ssd_score forlder. Run ```python compute_ssd_score.py --input_dir path/to/generated/images --img_index 2```
 
 #### Additional notes
 Both training and testing require large amount of disk space, because ```compute_pose_map_batch``` in ```pose_dataset.py``` store intermediate pose_maps on disk. This help to improve both training and testing time. If you don't have enogh space comment lines 64,65,66 and 69 in ```pose_dataset.py```
