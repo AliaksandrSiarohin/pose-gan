@@ -99,12 +99,13 @@ def concatenate_skips(skips_app, skips_pose, warp, image_size, warp_agg, warp_sk
         skips.append(out)
     return skips
 
-def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg):
+def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg, use_bg):
     use_warp_skip = warp_skip != 'none'
     input_img = Input(list(image_size) + [3])
     output_pose = Input(list(image_size) + [18])
     output_img = Input(list(image_size) + [3])
-
+    bg_img = Input(list(image_size) + [3]) 
+   
     nfilters_decoder = (512, 512, 512, 256, 128, 3) if max(image_size) == 128 else (512, 512, 512, 512, 256, 128, 3)
     nfilters_encoder = (64, 128, 256, 512, 512, 512) if max(image_size) == 128 else (64, 128, 256, 512, 512, 512, 512)
 
@@ -122,9 +123,14 @@ def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg):
     else:
         input_pose = []
 
+    if use_bg:
+       bg_img = [bg_img]
+    else:
+       bg_img = [] 
+
     if use_warp_skip:
         enc_app_layers = encoder([input_img] + input_pose, nfilters_encoder)
-        enc_tg_layers = encoder([output_pose], nfilters_encoder)
+        enc_tg_layers = encoder([output_pose] + bg_img, nfilters_encoder)
         enc_layers = concatenate_skips(enc_app_layers, enc_tg_layers, warp, image_size, warp_agg, warp_skip)
     else:
         enc_layers = encoder([input_img] + input_pose + [output_pose], nfilters_encoder)
@@ -133,15 +139,17 @@ def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg):
 
     warp_in_disc = [] if disc_type != 'warp' else warp
 
-    return Model(inputs=[input_img] + input_pose + [output_img, output_pose] + warp,
-                 outputs=[input_img] + input_pose + [out, output_pose] + warp_in_disc)
+    return Model(inputs=[input_img] + input_pose + [output_img, output_pose] + bg_img + warp,
+                 outputs=[input_img] + input_pose + [out, output_pose] + bg_img + warp_in_disc)
 
 
-def make_discriminator(image_size, use_input_pose, warp_skip, disc_type, warp_agg):
+def make_discriminator(image_size, use_input_pose, warp_skip, disc_type, warp_agg, use_bg):
     input_img = Input(list(image_size) + [3])
     output_pose = Input(list(image_size) + [18])
     input_pose = Input(list(image_size) + [18])
     output_img = Input(list(image_size) + [3])
+    bg_img = Input(list(image_size) + [3]) 
+
 
     if warp_skip == 'full':
         warp = [Input((10, 8))]
@@ -155,8 +163,15 @@ def make_discriminator(image_size, use_input_pose, warp_skip, disc_type, warp_ag
     else:
         input_pose = []
 
+    if use_bg:
+       bg_img = [bg_img]
+    else:
+       bg_img = []
+
+    assert (not use_bg) or (disc_type == 'call')
+
     if disc_type == 'call':
-        out = Concatenate(axis=-1)([input_img] + input_pose + [output_img, output_pose])
+        out = Concatenate(axis=-1)([input_img] + input_pose + [output_img, output_pose] + bg_img)
         out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)
         out = block(out, 128)
         out = block(out, 256)
@@ -164,7 +179,7 @@ def make_discriminator(image_size, use_input_pose, warp_skip, disc_type, warp_ag
         out = block(out, 1, bn=False)
         out = Activation('sigmoid')(out)
         out = Flatten()(out)
-        return Model(inputs=[input_img] + input_pose + [output_img, output_pose], outputs=[out])
+        return Model(inputs=[input_img] + input_pose + [output_img, output_pose] + bg_img, outputs=[out])
     elif disc_type == 'sim':
         out = Concatenate(axis=-1)([output_img, output_pose])
         out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)

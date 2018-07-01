@@ -21,6 +21,9 @@ class PoseHMDataset(UGANDataset):
         self._images_dir_train = kwargs['images_dir_train']
         self._images_dir_test = kwargs['images_dir_test']
 
+        self._bg_images_dir_train = kwargs['bg_images_dir_train']
+        self._bg_images_dir_test = kwargs['bg_images_dir_test']
+
         self._pairs_file_train = pd.read_csv(kwargs['pairs_file_train'])
         self._pairs_file_test = pd.read_csv(kwargs['pairs_file_test'])
 
@@ -36,6 +39,7 @@ class PoseHMDataset(UGANDataset):
         self._warp_skip = kwargs['warp_skip']
         self._disc_type = kwargs['disc_type']
         self._tmp_pose = kwargs['tmp_pose_dir']
+        self._use_bg = kwargs['use_bg']
 
         self._test_data_index = 0
 
@@ -116,6 +120,19 @@ class PoseHMDataset(UGANDataset):
             i += 1
         return self._preprocess_image(batch)
 
+    def load_bg(self, pair_df):
+        batch = np.empty([self._batch_size] + list(self._image_size) + [3])
+        i = 0
+        for _, p in pair_df.iterrows():
+            name = p['to'].replace('.jpg', '_BG.jpg') 
+            #print os.path.join(self._images_dir_train, name)
+            if os.path.exists(os.path.join(self._bg_images_dir_train, name)):
+                batch[i] = imread(os.path.join(self._bg_images_dir_train, name))
+            else:
+                batch[i] = imread(os.path.join(self._bg_images_dir_test, name))
+            i += 1
+        return self._preprocess_image(batch)
+
     def load_batch(self, index, for_discriminator, validation=False):
         if validation:
             pair_df = self._pairs_file_test.iloc[index]
@@ -127,8 +144,12 @@ class PoseHMDataset(UGANDataset):
         result.append(self.load_image_batch(pair_df, 'to'))
         result.append(self.compute_pose_map_batch(pair_df, 'to'))
 
+        if self._use_bg:
+            result.append(self.load_bg(pair_df))
+
         if self._warp_skip != 'none' and (not for_discriminator or self._disc_type == 'warp'):
             result += self.compute_cord_warp_batch(pair_df)
+
         return result
 
     def next_generator_sample(self):

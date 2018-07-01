@@ -27,8 +27,8 @@ def args():
     parser.add_argument("--nn_loss_area_size", default=1, type=int, help="Use nearest neighbour loss")
     parser.add_argument("--use_validation", default=1, type=int, help="Use validation")
 
-    parser.add_argument('--dataset', default='market', choices=['market', 'fasion', 'fasion128', 'fasion128128'],
-                        help='Market or fasion')
+    parser.add_argument('--dataset', default='market', choices=['market', 'fasion', 'prw', 'fasion128', 'fasion128128'],
+                        help='Market, fasion or prw')
 
 
     parser.add_argument("--display_ratio", default=1, type=int,  help='Number of epochs between ploting')
@@ -46,7 +46,8 @@ def args():
 
     parser.add_argument("--disc_type", default='call', choices=['call', 'sim', 'warp'],
                         help="Type of discriminator call - concat all, sim - siamease, sharewarp - warp.")
-
+    
+    parser.add_argument("--use_bg", default=0, type=int, help='Use background images only for prw dataset')
 
     parser.add_argument("--generated_images_dir", default='output/generated_images',
                         help='Folder with generated images from training dataset')
@@ -67,6 +68,9 @@ def args():
 
     args.pairs_file_train = 'data/' + args.dataset + '-pairs-train.csv'
     args.pairs_file_test = 'data/' + args.dataset + '-pairs-test.csv'
+
+    args.bg_images_dir_train = 'data/' + args.dataset + '-dataset/train-bg'
+    args.bg_images_dir_test = 'data/' + args.dataset + '-dataset/test-bg'
 
     if args.dataset == 'fasion':
         args.image_size = (256, 256)
