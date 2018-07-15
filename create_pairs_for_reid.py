@@ -33,6 +33,6 @@ if __name__ == "__main__":
     df = filter_not_valid(df_keypoints)
 
     print ('Compute pair for train re-id...')
-    pairs_df_train = make_pairs(df)
+    pairs_df_train = make_pairs(df, 2)
     print ('Number of pairs: %s' % len(pairs_df_train))
     pairs_df_train.to_csv('data/market-re-id-pairs.csv', index=False)
