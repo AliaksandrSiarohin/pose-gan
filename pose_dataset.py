@@ -40,6 +40,8 @@ class PoseHMDataset(UGANDataset):
         self._disc_type = kwargs['disc_type']
         self._tmp_pose = kwargs['tmp_pose_dir']
         self._use_bg = kwargs['use_bg']
+        self._pose_rep_type = kwargs['pose_rep_type']
+        self._cache_pose_rep = kwargs['cache_pose_rep']
 
         self._test_data_index = 0
 
@@ -60,17 +62,27 @@ class PoseHMDataset(UGANDataset):
 
     def compute_pose_map_batch(self, pair_df, direction):
         assert direction in ['to', 'from']
-        batch = np.empty([self._batch_size] + list(self._image_size) + [18])
+        batch = np.empty([self._batch_size] + list(self._image_size) + [18 if self._pose_rep_type == 'hm' else 3])
         i = 0
         for _, p in pair_df.iterrows():
             row = self._annotations_file.loc[p[direction]]
-            file_name = self._tmp_pose + p[direction] + '.npy'
-            if os.path.exists(file_name):
-                pose = np.load(file_name)
+            if self._cache_pose_rep:
+                file_name = self._tmp_pose + p[direction] + self._pose_rep_type + '.npy'
+                if os.path.exists(file_name):
+                    pose = np.load(file_name)
+                else:
+                    kp_array = pose_utils.load_pose_cords_from_strings(row['keypoints_y'], row['keypoints_x'])
+                    if self._pose_rep_type == 'hm':
+                        pose = pose_utils.cords_to_map(kp_array, self._image_size)
+                    else:
+                        pose = pose_transform.make_stickman(kp_array, self._image_size)
+                    np.save(file_name, pose)
             else:
-                kp_array = pose_utils.load_pose_cords_from_strings(row['keypoints_y'], row['keypoints_x'])
-                pose = pose_utils.cords_to_map(kp_array, self._image_size)
-                np.save(file_name, pose)
+                    kp_array = pose_utils.load_pose_cords_from_strings(row['keypoints_y'], row['keypoints_x'])
+                    if self._pose_rep_type == 'hm':
+                        pose = pose_utils.cords_to_map(kp_array, self._image_size)
+                    else:
+                        pose = pose_transform.make_stickman(kp_array, self._image_size)
             batch[i] = pose
             i += 1
         return batch
@@ -187,7 +199,10 @@ class PoseHMDataset(UGANDataset):
 
         tg_app = super(PoseHMDataset, self).display(tg_app, None, row=row, col=col)
 
-        pose_images = np.array([pose_utils.draw_pose_from_map(pose)[0] for pose in tg_pose])
+        if self._pose_rep_type == 'hm':
+            pose_images = np.array([pose_utils.draw_pose_from_map(pose)[0] for pose in tg_pose])
+        else:
+            pose_images =  (255 * tg_pose).astype('uint8')
         tg_pose = super(PoseHMDataset, self).display(pose_images, None, row=row, col=col)
 
         tg_img = super(PoseHMDataset, self).display(tg_img, None, row=row, col=col)

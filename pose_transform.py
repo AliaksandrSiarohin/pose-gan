@@ -8,6 +8,7 @@ import pylab as plt
 import numpy as np
 from skimage.io import imread
 from skimage.transform import warp_coords
+import skimage.draw
 
 import skimage.measure
 import skimage.transform
@@ -298,31 +299,119 @@ def estimate_uniform_transform(array1, array2):
         return no_point_tr.reshape((-1, 9))[..., :-1]
 
 
+def draw_line(fr, to, thickness, shape):
+    norm_vec = fr - to
+    norm_vec = np.array([-norm_vec[1], norm_vec[0]])
+    norm_vec = thickness * norm_vec / np.linalg.norm(norm_vec)
+
+    vetexes = np.array([
+        fr + norm_vec,
+        fr - norm_vec,
+        to - norm_vec,
+        to + norm_vec
+    ])
+
+    return skimage.draw.polygon(vetexes[:, 1], vetexes[:, 0], shape=shape)
+
+def make_stickman(kp_array, img_shape):
+    kp = give_name_to_keypoints(kp_array)
+    #Adapted from https://github.com/CompVis/vunet/
+    # three channels: left, right, center
+    scale_factor = img_shape[1] / 128.0
+    thickness = int(3 * scale_factor)
+    imgs = list()
+    for i in range(3):
+        imgs.append(np.zeros(img_shape[:2], dtype="float32"))
+
+    body = ["Lhip", "Lsho", "Rsho", "Rhip"]
+    body_pts = get_array_of_points(kp, body)
+    if np.min(body_pts) >= 0:
+        body_pts = np.int_(body_pts)
+        rr,cc = skimage.draw.polygon(body_pts[:,1], body_pts[:, 0], shape=img_shape)
+        imgs[2][rr, cc] = 1
+
+    right_lines = [
+            ("Rank", "Rkne"),
+            ("Rkne", "Rhip"),
+            ("Rhip", "Rsho"),
+            ("Rsho", "Relb"),
+            ("Relb", "Rwri")]
+    for line in right_lines:
+        if check_keypoints_present(kp, line):
+            line_pts = get_array_of_points(kp, line)
+            rr,cc = draw_line(line_pts[0], line_pts[1], thickness=thickness, shape=img_shape)
+            imgs[0][rr,cc] = 1
+
+    left_lines = [
+            ("Lank", "Lkne"),
+            ("Lkne", "Lhip"),
+            ("Lhip", "Lsho"),
+            ("Lsho", "Lelb"),
+            ("Lelb", "Lwri")]
+    for line in left_lines:
+        if check_keypoints_present(kp, line):
+            line_pts = get_array_of_points(kp, line)
+            rr,cc = draw_line(line_pts[0], line_pts[1], thickness=thickness, shape=img_shape)
+            imgs[1][rr, cc] = 1
+
+    if check_keypoints_present(kp, ['Rsho', 'Lsho', 'nose']):
+        rs = kp["Rsho"]
+        ls = kp["Lsho"]
+        cn = kp["nose"]
+
+        neck = 0.5*(rs+ls)
+        a = neck
+        b = cn
+        if np.min(a) >= 0 and np.min(b) >= 0:
+            rr,cc = draw_line(a, b, thickness=thickness, shape=img_shape)
+            imgs[0][rr, cc] = 0.5
+            imgs[1][rr, cc] = 0.5
+
+    if check_keypoints_present(kp, ['Reye', 'Leye', 'nose']):
+        reye = kp["Reye"]
+        leye = kp["Leye"]
+        cn = kp["nose"]
+
+        neck = 0.5*(rs+ls)
+        a = tuple(np.int_(neck))
+        b = tuple(np.int_(cn))
+        if np.min(a) >= 0 and np.min(b) >= 0:
+            rr,cc = draw_line(cn, reye, thickness=thickness, shape=img_shape)
+            imgs[0][rr, cc] = 0.5
+            rr,cc = draw_line(cn, leye, thickness=thickness, shape=img_shape)
+            imgs[1][rr, cc] = 0.5
+    img = np.stack(imgs, axis = -1)
+    return img
+
+
 if __name__ == "__main__":
     import pandas as pd
     import os
     from skimage.transform import resize
-    pairs_df = pd.read_csv('data/fasion-pairs-test.csv')
-    kp_df = pd.read_csv('data/fasion-annotation-test.csv', sep=':')
-    img_folder = 'data/fasion-dataset/test'
+    pairs_df = pd.read_csv('data/tmp-pairs-test.csv')
+    kp_df = pd.read_csv('data/tmp-annotation-test.csv', sep=':')
+    img_folder = 'data/tmp-dataset/test'
     f = open('lolkek.txt', 'w')
     for _, row in pairs_df.iterrows():
-
-        fr = 'fasionMENJacketsVestsid0000243904_1front.jpg'# row['from']
-        to = 'fasionMENJacketsVestsid0000243904_4full.jpg'#row['to']
+        print 1
+        fr = 'denis_pjump000004.jpg'# row['from']
+        to = 'denis_pjump000004.jpg'#row['to']
         fr_img = imread(os.path.join(img_folder, fr))
         to_img = imread(os.path.join(img_folder, to))
 
         kp_fr = kp_df[kp_df['name'] == fr].iloc[0]
         kp_to = kp_df[kp_df['name'] == to].iloc[0]
 
+
         plt.subplot(3, 1, 1)
         kp_fr = pose_utils.load_pose_cords_from_strings(kp_fr['keypoints_y'], kp_fr['keypoints_x'])
         kp_to = pose_utils.load_pose_cords_from_strings(kp_to['keypoints_y'], kp_to['keypoints_x'])
 
         img = fr_img.copy()
-        p, m = pose_utils.draw_pose_from_cords(kp_fr, img.shape[:2])
-        img[m] = p[m]
+        #p, m = pose_utils.draw_pose_from_cords(kp_fr, img.shape[:2])
+        img = make_stickman(kp_to, fr_img.shape)
+
+        #img[m] = p[m]
         plt.imshow(img)
 
         plt.subplot(3, 1, 2)

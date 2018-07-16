@@ -99,10 +99,10 @@ def concatenate_skips(skips_app, skips_pose, warp, image_size, warp_agg, warp_sk
         skips.append(out)
     return skips
 
-def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg, use_bg):
+def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg, use_bg, pose_rep_type):
     use_warp_skip = warp_skip != 'none'
     input_img = Input(list(image_size) + [3])
-    output_pose = Input(list(image_size) + [18])
+    output_pose = Input(list(image_size) + [18 if pose_rep_type == 'hm' else 3])
     output_img = Input(list(image_size) + [3])
     bg_img = Input(list(image_size) + [3]) 
    
@@ -119,7 +119,7 @@ def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg, u
         warp = []
 
     if use_input_pose:
-        input_pose = [Input(list(image_size) + [18])]
+        input_pose = [Input(list(image_size) + [18 if pose_rep_type == 'hm' else 3])]
     else:
         input_pose = []
 
@@ -143,10 +143,10 @@ def make_generator(image_size, use_input_pose, warp_skip, disc_type, warp_agg, u
                  outputs=[input_img] + input_pose + [out, output_pose] + bg_img + warp_in_disc)
 
 
-def make_discriminator(image_size, use_input_pose, warp_skip, disc_type, warp_agg, use_bg):
+def make_discriminator(image_size, use_input_pose, warp_skip, disc_type, warp_agg, use_bg, pose_rep_type):
     input_img = Input(list(image_size) + [3])
-    output_pose = Input(list(image_size) + [18])
-    input_pose = Input(list(image_size) + [18])
+    output_pose = Input(list(image_size) + [18 if pose_rep_type == 'hm' else 3])
+    input_pose = Input(list(image_size) + [18 if pose_rep_type == 'hm' else 3])
     output_img = Input(list(image_size) + [3])
     bg_img = Input(list(image_size) + [3]) 
 

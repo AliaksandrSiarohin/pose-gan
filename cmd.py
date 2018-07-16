@@ -49,6 +49,10 @@ def args():
     
     parser.add_argument("--use_bg", default=0, type=int, help='Use background images only for prw dataset')
 
+    parser.add_argument("--pose_rep_type", default='hm', choices=['hm', 'stickman'],
+        help='Representation of the pose, hm - heatmap, stickman - like in vunet (https://github.com/CompVis/vunet).')
+    parser.add_argument("--cache_pose_rep", default=1, type=int, help="Cache pose representation on disk.")
+
     parser.add_argument("--generated_images_dir", default='output/generated_images',
                         help='Folder with generated images from training dataset')
 

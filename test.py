@@ -112,7 +112,8 @@ def test():
         if args.use_dropout_test:
             K.set_learning_phase(1)
         dataset = PoseHMDataset(test_phase=True, **vars(args))
-        generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type, args.warp_agg, args.use_bg)
+        generator = make_generator(args.image_size, args.use_input_pose, args.warp_skip, args.disc_type, args.warp_agg,
+                                   args.use_bg, args.pose_rep_type)
         assert (args.generator_checkpoint is not None)
         generator.load_weights(args.generator_checkpoint)
         input_images, target_images, generated_images, names = generate_images(dataset, generator, args.use_input_pose)
