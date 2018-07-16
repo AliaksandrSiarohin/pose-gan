@@ -8,7 +8,7 @@ python  create_dataset_for_reid.py --generator_checkpoint generator-warp-maks-nn
 
 2.1 Replace market_evaluation/dataset/train.txt with train.txt from this folder (or root folder if you create dataset using script). 
 
-2.2 Increase number of iteration to 100k in models/market/ResNet_50/ResNet_50_solver.prototxt
+2.2 Increase number of iteration to 200k (and step to 90k) in models/market/ResNet_50/ResNet_50_solver.prototxt
 
 2.3 Follow the instructions for ResNet50.
 
