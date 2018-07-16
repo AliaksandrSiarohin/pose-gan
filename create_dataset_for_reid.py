@@ -107,7 +107,8 @@ def test():
     generator.load_weights(args.generator_checkpoint)
 
     print ("Generate images...")
-#    generate_images(dataset, generator, args.use_input_pose, args.generated_images_dir, train_file_name)
+    generate_images(dataset, generator, args.use_input_pose, args.generated_images_dir, train_file_name,
+                    store_train_images=store_train_images)
     
     print ("Creating train file...")
     create_train_file(args.generated_images_dir, train_file_name, generated_as_separate)

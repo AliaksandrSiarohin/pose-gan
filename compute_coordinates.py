@@ -12,11 +12,6 @@ from scipy.ndimage import gaussian_filter
 
 from cmd import args
 
-args = args()
-
-model = load_model(args.pose_estimator)
-
-
 mapIdx = [[31,32], [39,40], [33,34], [35,36], [41,42], [43,44], [19,20], [21,22],
           [23,24], [25,26], [27,28], [29,30], [47,48], [49,50], [53,54], [51,52],
           [55,56], [37,38], [45,46]]
@@ -25,8 +20,12 @@ limbSeq = [[2,3], [2,6], [3,4], [4,5], [6,7], [7,8], [2,9], [9,10],
            [10,11], [2,12], [12,13], [13,14], [2,1], [1,15], [15,17],
            [1,16], [16,18], [3,17], [6,18]]
 
+threshold = 0.1
+boxsize = 368
+scale_search = [0.5, 1, 1.5, 2]
 
-def compute_cordinates(heatmap_avg, paf_avg, th1=0.1, th2=0.05):
+
+def compute_cordinates(heatmap_avg, paf_avg, oriImg, th1=0.1, th2=0.05):
     all_peaks = []
     peak_counter = 0
 
@@ -171,50 +170,56 @@ def compute_cordinates(heatmap_avg, paf_avg, th1=0.1, th2=0.05):
             cordinates.append([X, Y])
     return np.array(cordinates).astype(int)
 
-for dataset in ['train', 'test']:
-    input_folder = vars(args)['images_dir_' + dataset]
-    output_path = vars(args)['annotations_file_' + dataset]
 
-    threshold = 0.1
-    boxsize = 368
-    scale_search = [0.5, 1, 1.5, 2]
+def cordinates_from_image_file(image_name, model):
+    oriImg = imread(image_name)[:, :, ::-1]  # B,G,R order
 
-    if os.path.exists(output_path):
-        processed_names = set(pd.read_csv(output_path, sep=':')['name'])
-        result_file = open(output_path, 'a')
-    else:
-        result_file = open(output_path, 'w')
-        processed_names = set()
-        print >> result_file, 'name:keypoints_y:keypoints_x'
+    multiplier = [x * boxsize / oriImg.shape[0] for x in scale_search]
 
-    for image_name in tqdm(os.listdir(input_folder)):
-        if image_name in processed_names:
-            continue
+    heatmap_avg = np.zeros((oriImg.shape[0], oriImg.shape[1], 19))
+    paf_avg = np.zeros((oriImg.shape[0], oriImg.shape[1], 38))
 
-        oriImg = imread(os.path.join(input_folder, image_name))[:, :, ::-1]  # B,G,R order
+    for m in range(len(multiplier)):
+        scale = multiplier[m]
 
-        multiplier = [x * boxsize / oriImg.shape[0] for x in scale_search]
+        new_size = (np.array(oriImg.shape[:2]) * scale).astype(np.int32)
+        imageToTest = resize(oriImg, new_size, order=3, preserve_range=True)
+        imageToTest_padded = imageToTest[np.newaxis, :, :, :]/255 - 0.5
 
-        heatmap_avg = np.zeros((oriImg.shape[0], oriImg.shape[1], 19))
-        paf_avg = np.zeros((oriImg.shape[0], oriImg.shape[1], 38))
+        output1, output2 = model.predict(imageToTest_padded)
 
-        for m in range(len(multiplier)):
-            scale = multiplier[m]
-
-            new_size = (np.array(oriImg.shape[:2]) * scale).astype(np.int32)
-            imageToTest = resize(oriImg, new_size, order=3, preserve_range=True)
-            imageToTest_padded = imageToTest[np.newaxis, :, :, :]/255 - 0.5
-
-            output1, output2 = model.predict(imageToTest_padded)
-
-            heatmap = st.resize(output2[0], oriImg.shape[:2], preserve_range=True, order=1)
-            paf = st.resize(output1[0], oriImg.shape[:2], preserve_range=True, order=1)
-            heatmap_avg += heatmap
-            paf_avg += paf
+        heatmap = st.resize(output2[0], oriImg.shape[:2], preserve_range=True, order=1)
+        paf = st.resize(output1[0], oriImg.shape[:2], preserve_range=True, order=1)
+        heatmap_avg += heatmap
+        paf_avg += paf
 
         heatmap_avg /= len(multiplier)
+        pose_cords = compute_cordinates(heatmap_avg, paf_avg, oriImg=oriImg)
+    return pose_cords
 
-        pose_cords = compute_cordinates(heatmap_avg, paf_avg)
 
-        print >> result_file, "%s: %s: %s" % (image_name, str(list(pose_cords[:, 0])), str(list(pose_cords[:, 1])))
-        result_file.flush()
+if __name__ == "__main__":
+    args = args()
+    model = load_model(args.pose_estimator)
+
+    for dataset in ['train', 'test']:
+        input_folder = vars(args)['images_dir_' + dataset]
+        output_path = vars(args)['annotations_file_' + dataset]
+
+
+        if os.path.exists(output_path):
+            processed_names = set(pd.read_csv(output_path, sep=':')['name'])
+            result_file = open(output_path, 'a')
+        else:
+            result_file = open(output_path, 'w')
+            processed_names = set()
+            print >> result_file, 'name:keypoints_y:keypoints_x'
+
+        for image_name in tqdm(os.listdir(input_folder)):
+            if image_name in processed_names:
+                continue
+
+            pose_cords = cordinates_from_image_file(os.path.join(input_folder, image_name), model=model)
+
+            print >> result_file, "%s: %s: %s" % (image_name, str(list(pose_cords[:, 0])), str(list(pose_cords[:, 1])))
+            result_file.flush()
