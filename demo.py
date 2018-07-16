@@ -11,6 +11,7 @@ from test import generate_images, save_images
 from keras.models import load_model
 from skimage.io import imread, imsave
 from skimage.transform import resize
+import numpy as np
 
 if __name__ == "__main__":
     args = cmd.args()
@@ -21,7 +22,8 @@ if __name__ == "__main__":
     source_image = 'data/source-image.jpg'
     bg_image = 'data/bg-image.jpg'
 
-    crop_frames = False
+    #For target images use kp from previous frame if not detected
+    interpolate = True
 
     args.images_dir_test = 'data/' + dataset + '-dataset/test'
     args.annotations_file_test = 'data/' + dataset + '-annotation-test.csv'
@@ -48,59 +50,22 @@ if __name__ == "__main__":
 
     kp_model = load_model(args.pose_estimator)
     images_to_annotate = [os.path.join(target_images_folder, name) for name in os.listdir(target_images_folder)]
+    images_to_annotate.sort()
     images_to_annotate.append(source_image)
 
     result_file = open(args.annotations_file_test, 'w')
     print >>result_file, 'name:keypoints_y:keypoints_x'
-
+    prev_pose_cord = -np.ones((18, 2))
     for i, image_name in tqdm(enumerate(images_to_annotate)):
-
-        if not crop_frames or image_name == source_image:
-            img = imread(image_name)
-            imsave(os.path.join(args.images_dir_test, os.path.basename(image_name)), resize(img, (128, 64)))
-            pose_cords = cordinates_from_image_file(os.path.join(args.images_dir_test, os.path.basename(image_name)),
+        img = imread(image_name)
+        imsave(os.path.join(args.images_dir_test, os.path.basename(image_name)), resize(img, (128, 64)))
+        pose_cords = cordinates_from_image_file(os.path.join(args.images_dir_test, os.path.basename(image_name)),
                                                     kp_model)
-        else:
-            pose_cords = cordinates_from_image_file(image_name, kp_model)
-            if i == 0:
-                y, x = pose_cords[:, 0], pose_cords[:, 1]
 
-                x_min, x_max = x.min(), x.max()
-                y_min, y_max = y.min(), y.max()
+        if interpolate and image_name != source_image:
+            pose_cords[pose_cords == -1] = prev_pose_cord[pose_cords == -1]
+            prev_pose_cord = pose_cords
 
-                image = imread(image_name)
-                x_len = (x_max - x_min)
-                y_len = (y_max - y_min)
-
-                y_min -= int(0.2 * y_len)
-                y_max += int(0.2 * y_len)
-                y_len = (y_max - y_min)
-
-                target_x_len = y_len / 2
-                adj_x_len = int((target_x_len - x_len)/2)
-
-                x_min -= adj_x_len
-                x_max += adj_x_len
-
-                x_min = max(0, x_min)
-                y_min = max(0, y_min)
-
-                print x_min, x_max, y_min, y_max
-            image = imread(image_name)
-            image_crop = image[y_min:y_max, x_min:x_max]
-            mult_x = 64.0 / image_crop.shape[1]
-            mult_y = 128.0 / image_crop.shape[0]
-            image_crop = resize(image_crop, (128, 64))
-
-            imsave(os.path.join(args.images_dir_test, os.path.basename(image_name)), image_crop)
-
-            pose_cords[:, 0] -= y_min
-            pose_cords[:, 1] -= x_min
-
-            print pose_cords[:, 1]
-            pose_cords[:, 0] = (pose_cords[:, 0] * mult_y).astype('int64')
-            pose_cords[:, 1] = (pose_cords[:, 1] * mult_x).astype('int64')
-            print pose_cords[:, 1]
 
         print >> result_file, "%s: %s: %s" % (os.path.basename(image_name),
                                               str(list(pose_cords[:, 0])), str(list(pose_cords[:, 1])))
