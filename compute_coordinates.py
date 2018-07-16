@@ -193,8 +193,8 @@ def cordinates_from_image_file(image_name, model):
         heatmap_avg += heatmap
         paf_avg += paf
 
-        heatmap_avg /= len(multiplier)
-        pose_cords = compute_cordinates(heatmap_avg, paf_avg, oriImg=oriImg)
+    heatmap_avg /= len(multiplier)
+    pose_cords = compute_cordinates(heatmap_avg, paf_avg, oriImg=oriImg)
     return pose_cords
 
 

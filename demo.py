@@ -15,15 +15,23 @@ if __name__ == "__main__":
 
     dataset = 'tmp'
 
-    args.images_dir_test = 'data/' + dataset + '-dataset/tmp'
-    args.annotations_file_test = 'data/' + dataset + '-annotation-tmp.csv'
-    args.pairs_file_test = 'data/' + dataset + '-pairs-tmp.csv'
-    args.bg_images_dir_test = 'data/' + dataset + '-dataset/tmp-bg'
+    args.images_dir_test = 'data/' + dataset + '-dataset/test'
+    args.annotations_file_test = 'data/' + dataset + '-annotation-test.csv'
+    args.pairs_file_test = 'data/' + dataset + '-pairs-test.csv'
+    args.bg_images_dir_test = 'data/' + dataset + '-dataset/test-bg'
 
-    args.images_dir_train = 'data/' + dataset + '-dataset/tmp'
-    args.annotations_file_train = 'data/' + dataset + '-annotation-tmp.csv'
-    args.pairs_file_train = 'data/' + dataset + '-pairs-tmp.csv'
-    args.bg_images_dir_train = 'data/' + dataset + '-dataset/tmp-bg'
+    args.images_dir_train = 'data/' + dataset + '-dataset/train'
+    args.annotations_file_train = 'data/' + dataset + '-annotation-train.csv'
+    args.pairs_file_train = 'data/' + dataset + '-pairs-train.csv'
+    args.bg_images_dir_train = 'data/' + dataset + '-dataset/train-bg'
+
+    f = open(args.annotations_file_train, 'w')
+    print >>f, 'name:keypoints_y:keypoints_x'
+    f.close()
+
+    f = open(args.pairs_file_train, 'w')
+    print >>f, 'from,to'
+    f.close()
 
     target_images_folder = 'data/target-images'
     source_image = 'data/source-image.jpg'
@@ -57,8 +65,9 @@ if __name__ == "__main__":
     df_keypoints = pd.read_csv(args.annotations_file_test, sep=':')
     df = filter_not_valid(df_keypoints)
     fr_list, to_list = [], []
-    for img_to in target_images_folder:
-        if img_to in df['name']:
+    valid_names = set(df['name'])
+    for img_to in os.listdir(target_images_folder):
+        if img_to in valid_names:
             fr_list.append(os.path.basename(source_image))
             to_list.append(img_to)
     pair_df = pd.DataFrame(index=range(len(fr_list)))
@@ -73,8 +82,8 @@ if __name__ == "__main__":
         rmtree(args.bg_images_dir_test)
     os.makedirs(args.bg_images_dir_test)
 
-    for img_to in target_images_folder:
-        if img_to in df['name']:
+    for img_to in os.listdir(target_images_folder):
+        if img_to in valid_names:
             copy(bg_image, os.path.join(args.bg_images_dir_test, img_to.replace('.jpg', '_BG.jpg')))
 
     print ("Generating images...")
