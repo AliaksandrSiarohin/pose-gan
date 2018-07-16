@@ -1,8 +1,12 @@
 ## RE-ID experiment 
-1. Download generated [images](https://yadi.sk/d/8quChtr63Raeof)
+1. Download generated [images](https://yadi.sk/d/8quChtr63Raeof) (Or create generated images using create_dataset_for_reid.py)
+```
+python  create_dataset_for_reid.py --generator_checkpoint generator-warp-maks-nn3-cl12.h5  --warp_skip mask
+```
+
 2. For IDE baseline: clone repository https://github.com/zhunzhong07/IDE-baseline-Market-1501.
 
-2.1 Replace market_evaluation/dataset/train.txt with train.txt from this folder.
+2.1 Replace market_evaluation/dataset/train.txt with train.txt from this folder (or root folder if you create dataset using script). 
 
 2.2 Increase number of iteration to 100k in models/market/ResNet_50/ResNet_50_solver.prototxt
 
