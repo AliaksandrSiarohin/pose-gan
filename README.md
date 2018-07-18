@@ -1,5 +1,8 @@
 # Deformable GANs for Pose-based Human Image Generation.
 [Check out our paper](https://arxiv.org/abs/1801.00055)
+
+This is keras+tensorflow implimentation. Check out pytorch [implimentation](https://github.com/ssfootball04/pose-transfer) by ssfootball04.
+
 ![Screenshot](sup-mat/teaser.jpg)
 
 ### Requirment
