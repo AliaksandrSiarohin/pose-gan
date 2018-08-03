@@ -59,3 +59,15 @@ To replicate the experiment in the paper use following setup:
 Both training and testing require large amount of disk space, because ```compute_pose_map_batch``` in ```pose_dataset.py``` store intermediate pose_maps on disk. This help to improve both training and testing time. If you don't have enogh space comment lines 64,65,66 and 69 in ```pose_dataset.py```
 
 Check sup-mat for additional data from paper: RE-ID experiment, user study images, names of the images from paper.
+
+Citation:
+
+```
+@InProceedings{Siarohin_2018_CVPR,
+author = {Siarohin, Aliaksandr and Sangineto, Enver and Lathuilière, Stéphane and Sebe, Nicu},
+title = {Deformable GANs for Pose-Based Human Image Generation},
+booktitle = {The IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+month = {June},
+year = {2018}
+}
+```
