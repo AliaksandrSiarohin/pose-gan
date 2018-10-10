@@ -87,10 +87,10 @@ def test():
 
     args.images_dir_test = args.images_dir_train
     args.pairs_file_test = 'data/market-re-id-pairs.csv'
-    pairs_for_each = 1
+    pairs_for_each = 2
     train_file_name = 'train.txt'
     store_train_images = True
-    generated_as_separate = True
+    generated_as_separate = False
     
     df_keypoints = pd.read_csv(args.annotations_file_train, sep=':')
     df = filter_not_valid(df_keypoints)
@@ -108,8 +108,7 @@ def test():
     generator.load_weights(args.generator_checkpoint)
 
     print ("Generate images...")
-    generate_images(dataset, generator, args.use_input_pose, args.generated_images_dir, train_file_name,
-                    store_train_images=store_train_images)
+    generate_images(dataset, generator, args.use_input_pose, args.generated_images_dir, store_train_images=store_train_images)
     
     print ("Creating train file...")
     create_train_file(args.generated_images_dir, train_file_name, generated_as_separate)
