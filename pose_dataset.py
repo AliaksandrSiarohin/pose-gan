@@ -27,8 +27,8 @@ class PoseHMDataset(UGANDataset):
         self._pairs_file_train = pd.read_csv(kwargs['pairs_file_train'])
         self._pairs_file_test = pd.read_csv(kwargs['pairs_file_test'])
 
-        self._annotations_file_test = pd.read_csv(kwargs['annotations_file_train'], sep=':')
-        self._annotations_file_train = pd.read_csv(kwargs['annotations_file_test'], sep=':')
+        self._annotations_file_test = pd.read_csv(kwargs['annotations_file_test'], sep=':')
+        self._annotations_file_train = pd.read_csv(kwargs['annotations_file_train'], sep=':')
 
         self._annotations_file = pd.concat([self._annotations_file_test, self._annotations_file_train],
                                            axis=0, ignore_index=True)
