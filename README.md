@@ -60,6 +60,8 @@ Both training and testing require large amount of disk space, because ```compute
 
 Check sup-mat for additional data from paper: RE-ID experiment, user study images, names of the images from paper.
 
+For deep-fashion there are 2 splits: old and new. Images from Fig. 5, 11, 13 is from the old split. Image in other figures, is from the new one. Scores in the tables is from new split. You can find both splits in https://yadi.sk/d/suymftBy3S7oKD . And checkpoints for both splits in https://yadi.sk/d/dxVvYxBw3QuUT9.
+
 Citation:
 
 ```
