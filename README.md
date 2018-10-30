@@ -32,9 +32,9 @@ In orger to train a model:
 To replicate the experiment in the paper use following setup:
 #### Market
 ##### baseline
-```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/baseline --checkpoints_dir output/baseline --warp_skip none --dataset market --l1_penalty_weight 10 --batch_size 4 --number_of_epochs 90```
+```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/baseline --checkpoints_dir output/baseline --warp_skip none --dataset market --l1_penalty_weight 100 --batch_size 4 --number_of_epochs 90```
 ##### dsc
-```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/dsc --checkpoints_dir output/dsc --warp_skip mask --dataset market --l1_penalty_weight 10 --batch_size 4 --number_of_epochs 90```
+```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/dsc --checkpoints_dir output/dsc --warp_skip mask --dataset market --l1_penalty_weight 100 --batch_size 4 --number_of_epochs 90```
 ##### full
 ```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/full --checkpoints_dir output/full --warp_skip mask --dataset market --l1_penalty_weight 0.01 --nn_loss_area_size 3 --batch_size 4 --content_loss_layer block1_conv2 --number_of_epochs 90```
 ##### feature matching
@@ -42,9 +42,9 @@ To replicate the experiment in the paper use following setup:
 
 #### Fashion
 ##### baseline
-```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/baseline --checkpoints_dir output/baseline --warp_skip none --dataset fasion --l1_penalty_weight 10 --batch_size 4 --number_of_epochs 90```
+```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/baseline --checkpoints_dir output/baseline --warp_skip none --dataset fasion --l1_penalty_weight 100 --batch_size 4 --number_of_epochs 90```
 ##### dsc
-```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/dsc --checkpoints_dir output/dsc --warp_skip mask --dataset fasion --l1_penalty_weight 10 --batch_size 4 --number_of_epochs 90```
+```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/dsc --checkpoints_dir output/dsc --warp_skip mask --dataset fasion --l1_penalty_weight 100 --batch_size 4 --number_of_epochs 90```
 ##### full
 ```CUDA_VISIBLE_DEVICES=0 python train.py --output_dir output/full --checkpoints_dir output/full --warp_skip mask --dataset fasion --l1_penalty_weight 0.01 --nn_loss_area_size 5 --batch_size 2 --content_loss_layer block1_conv2 --number_of_epochs 90```
 ##### feature matching
