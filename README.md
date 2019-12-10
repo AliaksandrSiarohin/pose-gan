@@ -72,4 +72,11 @@ booktitle = {The IEEE Conference on Computer Vision and Pattern Recognition (CVP
 month = {June},
 year = {2018}
 }
+
+@ARTICLE{Siarohin_2019_PAMI,
+author={Siarohin, Aliaksandr and Lathuilière, Stéphane  and Sangineto, Enver and Sebe, Nicu},
+journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
+title={Appearance and Pose-Conditioned Human Image Generation using Deformable GANs},
+year={2019}
+} 
 ```
