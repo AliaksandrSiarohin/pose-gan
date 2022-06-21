@@ -2,7 +2,7 @@ h5py==2.7.1
 keras==2.0.8
 keras-contrib==2.0.8
 matplotlib==2.1.1
-numpy==1.14.0
+numpy==1.22.0
 pandas==0.22.0
 Pillow==5.0.0
 scikit-image==0.13.1
