@@ -1,7 +1,7 @@
 from keras.models import Model, Input, Sequential
 from keras.layers import Flatten, Concatenate, Activation, Dropout, Dense
 from keras.layers.convolutional import Conv2D, Conv2DTranspose, ZeroPadding2D, Cropping2D
-from keras_contrib.layers.normalization import InstanceNormalization
+from keras_contrib.layers.normalization.instancenormalization import InstanceNormalization
 from keras.layers.advanced_activations import LeakyReLU
 import keras.backend as K
 from keras.backend import tf as ktf
