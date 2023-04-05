@@ -22,11 +22,17 @@ This is keras+tensorflow implimentation. Check out pytorch [implimentation](http
 ### Setting Up Python
 
 1. Install python=2.7
-```conda create -n <name_of_env> python=2.7
-   conda activate <name_of_env>```
+```
+conda create -n <name_of_env> python=2.7
+
+conda activate <name_of_env>
+```
 2. Install requirements
+
 ```pip install -r requirements.txt```
+
 3.  Install keras-contrib
+
 ```pip install git+https://www.github.com/keras-team/keras-contrib.git```
 
 
